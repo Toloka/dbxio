@@ -1,0 +1,93 @@
+[tool.poetry]
+name = "dbxio"
+version = "0"  # poetry-version-plugin will replace this with the actual version from dbxio/__init__.py
+description = "High-level Databricks client"
+authors = ["Nikita Yurasov <nikitayurasov@toloka.ai>"]
+readme = "README.md"
+packages = [{ include = "dbxio" }]
+
+[tool.poetry-version-plugin]
+source = "init"
+
+[tool.poetry.dependencies]
+python = ">=3.9,<4.0"
+attrs = "^23.1"
+cachetools = "^5.3"
+azure-storage-blob = "^12.19"
+azure-storage-common = "^2.1"
+azure-storage-file = "^2.1"
+azure-storage-file-datalake = "^12.14"
+azure-storage-file-share = "^12.15"
+azure_core = "1.28"
+azure_identity = "^1.13"
+databricks-sql-connector = ">=2.0"
+pandas = "<2.2.0"
+decorator = "^5.1.1"
+numpy = "^1.23"
+pydantic = ">=1.10,<3.0.0"
+python-dateutil = "^2.8"
+pyarrow = ">=14.0.1,<15.0.0"
+jinja2 = "^3.1.3"
+databricks-sdk = "~0.22"
+urllib3 = "~2.2"
+
+[tool.poetry.group.dev.dependencies]
+isort = "^5.12"
+black = { extras = ["d"], version = "^23.7" }
+twine = "*"
+pytest = "^8"
+pytest-cov = "~4.1"
+requests-mock = "~1.12.1"
+ipython = ">=8.18"
+pre-commit = "^3.6.2"
+ruff = "^0.3"
+deepdiff = "7.0.0"
+mypy = "1.7.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+# https://beta.ruff.rs/docs
+line-length = 120
+lint.select = [
+    # https://beta.ruff.rs/docs/rules
+    "F", # pyflakes
+    "E", # pycodestyle (errors)
+    "W", # pycodestyle (warnings) eg. trailing/leading whitespaces
+    "Q", # quotes
+    "I001", # unsorted imports (isort)
+    "TID", # tidy-imports
+]
+
+[tool.ruff.lint.flake8-quotes]
+inline-quotes = "single"
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.isort]
+# https://beta.ruff.rs/docs/settings/#isort
+
+[tool.ruff.format]
+quote-style = "single"
+docstring-code-format = true
+
+[tool.mypy]
+# docs: https://mypy.readthedocs.io/en/stable/config_file.html
+python_version = "3.10"
+warn_return_any = false
+warn_unused_configs = true
+warn_unused_ignores = true
+ignore_errors = false
+follow_imports = "silent"
+ignore_missing_imports = true
+strict = false
+no_implicit_optional = false
+disable_error_code = ["import-untyped"]
+
+# ignore mypy errors in tests
+[[tool.mypy.overrides]]
+module = "tests.*"
+ignore_errors = true

@@ -1,0 +1,44 @@
+name: Release
+
+on:
+  release:
+    types: [ published ]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    name: Build wheels and source distribution
+    runs-on: ubuntu-latest
+    environment: release
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Azure CLI login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.TLK_DEVTOOLS_ACTIONS_MI_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.TEST_INFRA_TLK_SUBSCRIPTION_ID }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+
+      - name: Install project
+        run: |
+          poetry install --with=dev --all-extras
+          poetry self add poetry-version-plugin
+
+      - name: Build and publish release
+        run: |
+          poetry config http-basic.azure "$USER" "$(az account get-access-token --resource 499b84ac-1321-427f-aa17-267ca6975798 | jq .accessToken --raw-output)"
+          poetry config repositories.azure https://pkgs.dev.azure.com/toloka/_packaging/Python/pypi/upload/
+          poetry -vv publish --build -r azure

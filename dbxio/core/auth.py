@@ -68,8 +68,8 @@ def _get_token_airflow(retries: int = 5) -> Union[str, None]:
     for retry_i in range(retries):
         try:
             c = AirflowConnection.get_connection_from_secrets(DatabricksHook.default_conn_name)
-            if dbt_token := c.get_password():
-                return dbt_token
+            if dbx_token := c.get_password():
+                return dbx_token
         except ModuleNotFoundError:
             logging.warning('Databricks provider is not installed, not retryable error')
             break

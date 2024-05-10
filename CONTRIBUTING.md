@@ -22,7 +22,7 @@ If you agree with these principles, please read and adopt our CLA. By providing 
 If you have already adopted terms and conditions of the CLA, you are able to provide your contributions. When you submit your first pull request, please add the following information into it:
 
 ```
-I hereby agree to the terms of either individual CLA available at: https://toloka.ai/legal/cla_individual or corporate CLA available at: https://toloka.ai/legal/cla_corporate, whichever is applicable to me, as it pertains to direct contributions to dbt-af only.
+I hereby agree to the terms of either individual CLA available at: https://toloka.ai/legal/cla_individual or corporate CLA available at: https://toloka.ai/legal/cla_corporate, whichever is applicable to me, as it pertains to direct contributions to dbxio only.
 ```
 
 It is enough to provide this notification only once.

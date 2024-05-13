@@ -101,6 +101,27 @@ def test_dbxio_default_credential_provider(patch_default_az_cred, monkeypatch):
     )
 
 
+@patch('dbxio.core.credentials.DefaultAzureCredential', side_effect=MockDefaultAzureCredential)
+def test_dbxio_default_credential_provider_with_semi_configured_credentials(patch_default_az_cred, monkeypatch):
+    monkeypatch.delenv(DATABRICKS_ACCESS_TOKEN, raising=False)
+    provider = DefaultCredentialProvider(
+        cluster_type=ClusterType.SQL_WAREHOUSE,
+        http_path='sql/protocolv1/o/111111/1-1-a',
+        server_hostname='adb-123456789.10.azuredatabricks.net',
+    )
+
+    assert provider._successful_provider is None
+
+    provider.ensure_set_auth_provider()
+    assert isinstance(provider._successful_provider, ClusterEnvAuthProvider)
+
+    assert provider.get_credentials() == ClusterCredentials(
+        access_token='azure_access_token_for_scope_2ff814a6-3304-4ab8-85cb-cd0e6f879c1d/.default',
+        server_hostname='adb-123456789.10.azuredatabricks.net',
+        http_path='sql/protocolv1/o/111111/1-1-a',
+    )
+
+
 def test_dbxio_bare_auth_provider():
     provider = BareAuthProvider(
         access_token='dapi123',

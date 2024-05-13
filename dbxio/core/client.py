@@ -1,14 +1,12 @@
-import logging
 from functools import cached_property
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
 import attrs
-from azure.identity import AzureCliCredential, DefaultAzureCredential
+from azure.identity import AzureCliCredential
 from databricks.sdk import StatementExecutionAPI, WorkspaceClient
 
-from dbxio.core.auth import AZ_CRED_PROVIDER_TYPE, SemiConfiguredClusterCredentials
-from dbxio.core.credentials import BaseAuthProvider, DefaultCredentialProvider
+from dbxio.core.credentials import AZ_CRED_PROVIDER_TYPE, BaseAuthProvider, DefaultCredentialProvider
 from dbxio.delta.query import BaseDatabricksQuery
 from dbxio.delta.sql_driver import SQLDriver, get_sql_driver
 from dbxio.delta.sql_utils import _FutureBaseResult
@@ -37,45 +35,31 @@ class DbxIOClient:
     ... )
     """
 
-    cluster_type: ClusterType = attrs.field(validator=attrs.validators.instance_of(ClusterType))
-
-    credential_provider: Union[BaseAuthProvider, DefaultCredentialProvider, None] = attrs.field(
-        default=None,
-        validator=attrs.validators.optional(
-            attrs.validators.instance_of((BaseAuthProvider, DefaultCredentialProvider))
-        ),
+    credential_provider: Union[BaseAuthProvider, DefaultCredentialProvider] = attrs.field(
+        validator=attrs.validators.instance_of((BaseAuthProvider, DefaultCredentialProvider))
     )
-    semi_configured_credentials: Union[SemiConfiguredClusterCredentials, None] = attrs.field(default=None)
 
     session_configuration: Optional[Dict[str, Any]] = None
 
-    az_cred_provider: AZ_CRED_PROVIDER_TYPE = attrs.Factory(DefaultAzureCredential)
-
-    def __attrs_post_init__(self):
-        if self.credential_provider is None:
-            self.credential_provider = DefaultCredentialProvider(
-                cluster_type=self.cluster_type,
-                az_cred_provider=self.az_cred_provider,
-                http_path=self.semi_configured_credentials.http_path,
-                server_hostname=self.semi_configured_credentials.server_hostname,
-            )
-
-        logging.debug(f'Using {self.az_cred_provider.__class__.__name__} as the credential provider')
-
     @classmethod
-    def from_cluster_settings(cls, http_path: str, server_hostname: str, cluster_type: ClusterType, **kwargs):
+    def from_cluster_settings(
+        cls,
+        http_path: str,
+        server_hostname: str,
+        cluster_type: ClusterType,
+        az_cred_provider: AZ_CRED_PROVIDER_TYPE = None,
+        **kwargs,
+    ):
         """
         Create a client from the cluster settings. Use this method if you want to use PAT for authentication.
         """
-        semi_configured_credentials = SemiConfiguredClusterCredentials(
+        provider = DefaultCredentialProvider(
+            cluster_type=cluster_type,
+            az_cred_provider=az_cred_provider,
             http_path=http_path,
             server_hostname=server_hostname,
         )
-        return cls(
-            semi_configured_credentials=semi_configured_credentials,
-            cluster_type=cluster_type,
-            **kwargs,
-        )
+        return cls.from_auth_provider(auth_provider=provider, **kwargs)
 
     @classmethod
     def from_auth_provider(cls, auth_provider: Union[BaseAuthProvider, DefaultCredentialProvider], **kwargs):
@@ -83,11 +67,11 @@ class DbxIOClient:
         Create a client from the auth provider.
         Use this method if you want to generate a short-lived token based on the available authentication method.
         """
-        return cls(credential_provider=auth_provider, cluster_type=auth_provider.cluster_type, **kwargs)
+        return cls(credential_provider=auth_provider, **kwargs)
 
     @property
     def _cluster_credentials(self):
-        return self.credential_provider.get_credentials(semi_configured_credentials=self.semi_configured_credentials)
+        return self.credential_provider.get_credentials()
 
     @property
     def workspace_api(self) -> WorkspaceClient:
@@ -103,7 +87,7 @@ class DbxIOClient:
     @cached_property
     def _sql_driver(self) -> SQLDriver:
         return get_sql_driver(
-            cluster_type=self.cluster_type,
+            cluster_type=self.credential_provider.cluster_type,
             cluster_credentials=self._cluster_credentials,
             statement_api=self.statement_api,
             session_configuration=self.session_configuration,
@@ -141,7 +125,7 @@ class DefaultDbxIOClient(DbxIOClient):
 
     def __init__(self, session_configuration: Optional[Dict[str, Any]] = None):
         super().__init__(
-            cluster_type=ClusterType.ALL_PURPOSE,
+            credential_provider=DefaultCredentialProvider(cluster_type=ClusterType.ALL_PURPOSE),
             session_configuration=session_configuration,
         )
 
@@ -155,7 +139,7 @@ class DefaultSqlDbxIOClient(DbxIOClient):
 
     def __init__(self, session_configuration: Optional[Dict[str, Any]] = None):
         super().__init__(
-            cluster_type=ClusterType.SQL_WAREHOUSE,
+            credential_provider=DefaultCredentialProvider(cluster_type=ClusterType.SQL_WAREHOUSE),
             session_configuration=session_configuration,
         )
 
@@ -169,7 +153,9 @@ class DefaultNebiusSqlClient(DbxIOClient):
 
     def __init__(self, session_configuration: Optional[Dict[str, Any]] = None):
         super().__init__(
-            cluster_type=ClusterType.SQL_WAREHOUSE,
-            az_cred_provider=AzureCliCredential(),
+            credential_provider=DefaultCredentialProvider(
+                cluster_type=ClusterType.SQL_WAREHOUSE,
+                az_cred_provider=AzureCliCredential(),
+            ),
             session_configuration=session_configuration,
         )

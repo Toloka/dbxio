@@ -1,7 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
 from functools import cache
-from typing import Union
+from typing import Optional, Union
 
 import attrs
 from azure.identity import DefaultAzureCredential
@@ -27,6 +27,10 @@ class BaseAuthProvider(ABC):
 
     cluster_type: ClusterType
     az_cred_provider: AZ_CRED_PROVIDER_TYPE
+    semi_configured_credentials: Optional[SemiConfiguredClusterCredentials]
+
+    def __init__(self, **kwargs):
+        raise NotImplementedError
 
     @abstractmethod
     def get_credentials(
@@ -34,6 +38,23 @@ class BaseAuthProvider(ABC):
         semi_configured_credentials: SemiConfiguredClusterCredentials = None,
     ) -> ClusterCredentials:
         raise NotImplementedError
+
+    @classmethod
+    def from_semi_configured_credentials(
+        cls,
+        http_path: str,
+        server_hostname: str,
+        cluster_type: ClusterType,
+        az_cred_provider: AZ_CRED_PROVIDER_TYPE = None,
+    ) -> 'BaseAuthProvider':
+        semi_configured_credentials = cls.build_semi_configured_credentials(http_path, server_hostname)
+        assert semi_configured_credentials is not None, 'http_path and server_hostname must be provided together'
+
+        return cls(
+            cluster_type=cluster_type,
+            az_cred_provider=az_cred_provider or DefaultAzureCredential(),
+            semi_configured_credentials=semi_configured_credentials,
+        )
 
     @staticmethod
     def build_semi_configured_credentials(
@@ -59,15 +80,17 @@ class ClusterEnvAuthProvider(BaseAuthProvider):
     cluster_type: ClusterType = attrs.field(validator=attrs.validators.instance_of(ClusterType))
     az_cred_provider: AZ_CRED_PROVIDER_TYPE = attrs.field(factory=DefaultAzureCredential)
 
+    semi_configured_credentials: Optional[SemiConfiguredClusterCredentials] = attrs.field(
+        default=None,
+        validator=attrs.validators.optional(attrs.validators.instance_of(SemiConfiguredClusterCredentials)),
+    )
+
     _cache: TTLCache = attrs.Factory(lambda: TTLCache(maxsize=1024, ttl=60 * 15))
 
     @cachedmethod(lambda self: self._cache)
-    def get_credentials(
-        self,
-        semi_configured_credentials: SemiConfiguredClusterCredentials = None,
-    ) -> ClusterCredentials:
+    def get_credentials(self) -> ClusterCredentials:
         try:
-            return get_local_variables(self.az_cred_provider, semi_configured_credentials)
+            return get_local_variables(self.az_cred_provider, self.semi_configured_credentials)
         except (TypeError, ValueError):
             logging.debug('ClusterEnvAuthProvider is not available. Not all environment variables are configured.')
             raise InsufficientCredentialsError
@@ -82,18 +105,22 @@ class ClusterAirflowAuthProvider(BaseAuthProvider):
     cluster_type: ClusterType = attrs.field(validator=attrs.validators.instance_of(ClusterType))
     az_cred_provider: AZ_CRED_PROVIDER_TYPE = attrs.field(factory=DefaultAzureCredential)
 
+    semi_configured_credentials: Optional[SemiConfiguredClusterCredentials] = attrs.field(
+        default=None,
+        validator=attrs.validators.optional(attrs.validators.instance_of(SemiConfiguredClusterCredentials)),
+    )
+
     _cache: TTLCache = attrs.Factory(lambda: TTLCache(maxsize=1024, ttl=60 * 15))
 
     @cachedmethod(lambda self: self._cache)
     def get_credentials(
         self,
-        semi_configured_credentials: SemiConfiguredClusterCredentials = None,
     ) -> ClusterCredentials:
         try:
             if not check_is_airflow_installed():
                 logging.debug('ClusterAirflowAuthProvider is not available. Airflow is not installed.')
                 raise InsufficientCredentialsError
-            return get_airflow_variables(self.cluster_type, semi_configured_credentials)
+            return get_airflow_variables(self.cluster_type, self.semi_configured_credentials)
         except TypeError:
             logging.debug('ClusterAirflowAuthProvider is not available. Some environment variables are not configured.')
             raise InsufficientCredentialsError
@@ -118,41 +145,44 @@ class DefaultCredentialProvider:
     ):
         self.cluster_type = cluster_type
         self.az_cred_provider = az_cred_provider or DefaultAzureCredential()
+        self.semi_configured_credentials = BaseAuthProvider.build_semi_configured_credentials(
+            http_path, server_hostname
+        )
+        if http_path or server_hostname:
+            assert (
+                self.semi_configured_credentials is not None
+            ), 'http_path and server_hostname must be provided together'
 
         self._chain = [ClusterAirflowAuthProvider, ClusterEnvAuthProvider]
 
         self._successful_provider: Union[BaseAuthProvider, None] = None
         if not lazy:
-            semi_configured_credentials = BaseAuthProvider.build_semi_configured_credentials(http_path, server_hostname)
-            assert semi_configured_credentials is not None, 'semi_configured_credentials must be provided if not lazy'
-            self.ensure_set_auth_provider(semi_configured_credentials)
+            assert (
+                self.semi_configured_credentials is not None
+            ), 'semi_configured_credentials must be provided if not lazy'
+            self.ensure_set_auth_provider()
 
-    def ensure_set_auth_provider(
-        self,
-        semi_configured_credentials: SemiConfiguredClusterCredentials = None,
-    ) -> None:
+    def ensure_set_auth_provider(self) -> None:
         for provider_type in self._chain:
             try:
                 provider = provider_type(
                     cluster_type=self.cluster_type,
                     az_cred_provider=self.az_cred_provider,
+                    semi_configured_credentials=self.semi_configured_credentials,
                 )
-                provider.get_credentials(semi_configured_credentials)
+                provider.get_credentials()
                 self._successful_provider = provider
                 return
             except InsufficientCredentialsError:
                 pass
         raise UnavailableAuthError('No available provider found')
 
-    def get_credentials(
-        self,
-        semi_configured_credentials: SemiConfiguredClusterCredentials = None,
-    ) -> ClusterCredentials:
+    def get_credentials(self) -> ClusterCredentials:
         if self._successful_provider is None:
-            self.ensure_set_auth_provider(semi_configured_credentials)
+            self.ensure_set_auth_provider()
 
         assert self._successful_provider is not None
-        return self._successful_provider.get_credentials(semi_configured_credentials)
+        return self._successful_provider.get_credentials()
 
 
 @attrs.frozen(slots=True)

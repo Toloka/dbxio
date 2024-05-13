@@ -114,7 +114,7 @@ def write_volume(
     assert storage_url, f'External location {default_external_location} does not have a URL'
     storage_name = get_storage_name_from_external_location(storage_url, default_external_location)
 
-    blob_service_client = get_blob_servie_client(storage_name, client.az_cred_provider)
+    blob_service_client = get_blob_servie_client(storage_name, client.credential_provider.az_cred_provider)
 
     with blobs_registries(blob_service_client, default_external_location, keep_blobs=True) as (blobs, metablobs):
         # here all files in the path, including subdirectories, are uploaded to the blob storage.

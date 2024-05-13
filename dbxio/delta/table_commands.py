@@ -1,6 +1,7 @@
 import logging
 import os.path
 from pathlib import Path
+from textwrap import dedent
 from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Union
 
 from databricks.sql import ServerOperationError
@@ -9,6 +10,7 @@ from dbxio.blobs.block_upload import upload_file
 from dbxio.blobs.parquet import create_pa_table, create_tmp_parquet, pa_table2parquet
 from dbxio.delta.parsers import infer_schema
 from dbxio.delta.query import ConstDatabricksQuery
+from dbxio.delta.sql_utils import _FutureBaseResult
 from dbxio.delta.table import Table, TableFormat
 from dbxio.utils.blobs import blobs_registries, get_blob_servie_client
 
@@ -16,7 +18,7 @@ if TYPE_CHECKING:
     from dbxio.core import DbxIOClient
 
 
-def exists_table(table: Union[str, Table], client: 'DbxIOClient'):
+def exists_table(table: Union[str, Table], client: 'DbxIOClient') -> bool:
     """
     Checks if table exists in the catalog. Tries to read one record from the table.
     """
@@ -29,7 +31,7 @@ def exists_table(table: Union[str, Table], client: 'DbxIOClient'):
         return False
 
 
-def create_table(table: Union[str, Table], client: 'DbxIOClient'):
+def create_table(table: Union[str, Table], client: 'DbxIOClient') -> _FutureBaseResult:
     """
     Creates a table in the catalog.
     If a table already exists, it does nothing.
@@ -50,15 +52,15 @@ def create_table(table: Union[str, Table], client: 'DbxIOClient'):
     return client.sql(query)
 
 
-def drop_table(table: Union[str, Table], client: 'DbxIOClient', force: bool = False):
+def drop_table(table: Union[str, Table], client: 'DbxIOClient', force: bool = False) -> _FutureBaseResult:
     """
     Drops a table from the catalog.
     Operation can be forced by setting force=True.
     """
     dbxio_table = Table.from_obj(table)
 
-    force_mark = 'IF EXISTS' if not force else ''
-    drop_sql = f'DROP TABLE {force_mark} {dbxio_table.safe_table_identifier}'
+    force_mark = 'IF EXISTS ' if force else ''
+    drop_sql = f'DROP TABLE {force_mark}{dbxio_table.safe_table_identifier}'
 
     return client.sql(drop_sql)
 
@@ -80,11 +82,11 @@ def read_table(
     dbxio_table = Table.from_obj(table)
 
     # FIXME use sql-builder
-    sql_columns_subset = ','.join(columns_subset) if columns_subset else '*'
+    sql_columns_subset = ','.join([f'`{col}`' for col in columns_subset]) if columns_subset else '*'
     sql_distinct = 'DISTINCT ' if distinct else ''
     _sql_query = f'SELECT {sql_distinct}{sql_columns_subset} FROM {dbxio_table.safe_table_identifier}'
     if limit_records:
-        _sql_query += f'LIMIT {limit_records}'
+        _sql_query += f' LIMIT {limit_records}'
 
     with client.sql(_sql_query) as fq:
         for records in fq:
@@ -119,7 +121,7 @@ def write_table(
     new_records: Union[Iterator[Dict], List[Dict]],
     client: 'DbxIOClient',
     append: bool = True,
-):
+) -> _FutureBaseResult:
     """
     Writes new records to the table using a direct SQL statement.
     Function is relatively fast on small datasets but can be slow or even fail on large datasets.
@@ -172,20 +174,23 @@ def copy_into_table(
     table_format: TableFormat,
     abs_name: str,
     abs_container_name: str,
-):
+    include_files_pattern: bool = False,
+) -> None:
     """
     Copy data from blob storage into the table. All files that match the pattern *.{table_format} will be copied.
     """
-    sql_copy_into_query = ConstDatabricksQuery(
-        f"""
-        COPY INTO {table.safe_table_identifier}
-        FROM "abfss://{abs_container_name}@{abs_name}.dfs.core.windows.net/{blob_path}"
-        FILEFORMAT = {table_format.value}
-        PATTERN = "*.{table_format.value.lower()}"
-        FORMAT_OPTIONS ("mergeSchema" = "true")
-        COPY_OPTIONS ("mergeSchema" = "true")
-        """,  # noqa
-    )
+    _copy_into_query = dedent(f"""
+    COPY INTO {table.safe_table_identifier}
+    FROM "abfss://{abs_container_name}@{abs_name}.dfs.core.windows.net/{blob_path}"
+    FILEFORMAT = {table_format.value}
+    """)
+    _pattern = f"PATTERN = '*.{table_format.value.lower()}'" if include_files_pattern else ''
+    _options = dedent("""
+    FORMAT_OPTIONS ("mergeSchema" = "true")
+    COPY_OPTIONS ("mergeSchema" = "true")
+    """)
+
+    sql_copy_into_query = ConstDatabricksQuery(f'{_copy_into_query} {_pattern} {_options}')
     client.sql(sql_copy_into_query).wait()
 
 
@@ -196,7 +201,7 @@ def bulk_write_table(
     abs_name: str,
     abs_container_name: str,
     append: bool = True,
-):
+) -> None:
     """
     Bulk write table using parquet format and CLONE INTO statement.
     Function requires blob storage to store temporary parquet file.
@@ -216,9 +221,10 @@ def bulk_write_table(
     pa_table = create_pa_table(columnar_table, schema=dbxio_table.schema)
     pa_table_as_bytes = pa_table2parquet(pa_table)
 
-    abs_client = get_blob_servie_client(abs_name, az_cred_provider=client.az_cred_provider).get_container_client(
-        abs_container_name
-    )
+    abs_client = get_blob_servie_client(
+        abs_name,
+        az_cred_provider=client.credential_provider.az_cred_provider,
+    ).get_container_client(abs_container_name)
 
     with create_tmp_parquet(pa_table_as_bytes, dbxio_table.table_identifier, abs_client) as tmp_path:
         if not append:
@@ -245,13 +251,13 @@ def bulk_write_local_files(
     append: bool = True,
     force: bool = False,
     max_concurrency: int = 1,
-):
+) -> None:
     """
     Write data from local files to the table.
     """
     assert table.schema, 'Table schema is required for bulk_write_local_files function'
 
-    abs_client = get_blob_servie_client(abs_name, az_cred_provider=client.az_cred_provider)
+    abs_client = get_blob_servie_client(abs_name, az_cred_provider=client.credential_provider.az_cred_provider)
     p = Path(path)
     files = p.glob(f'*.{table_format.value.lower()}') if p.is_dir() else [path]
 
@@ -277,6 +283,7 @@ def bulk_write_local_files(
             table=table,
             table_format=table_format,
             blob_path=str(os.path.commonpath(blobs)),
+            include_files_pattern=True,
             abs_name=abs_name,
             abs_container_name=abs_container_name,
         )
@@ -287,14 +294,14 @@ def merge_table(
     new_records: 'Union[Iterator[Dict] , List[Dict]]',
     partition_by: 'Union[str , List[str]]',
     client: 'DbxIOClient',
-):
+) -> None:
     """
     Merge new data into table. Use this function only if you have partitioning. Without partitioning, it's the same as
     append write operation.
     Function always waits till the end of deleting tmp table
     """
     dbxio_table = Table.from_obj(table)
-    tmp_table = Table(table_identifier=f'{dbxio_table.table_identifier}__dbxio_tmp', schema=dbxio_table.schema)  # type: ignore
+    tmp_table = Table(table_identifier=f'{dbxio_table.table_identifier}__dbxio_tmp', schema=dbxio_table.schema)
 
     write_table(tmp_table, new_records, client=client, append=False).wait()
 
@@ -306,14 +313,14 @@ def merge_table(
         [f'{_source_alias}.{part_col} == {_destination_alias}.{part_col}' for part_col in partition_by]
     )
 
-    merge_sql_query = f"""
+    merge_sql_query = dedent(f"""
         MERGE INTO {dbxio_table.safe_table_identifier} AS {_destination_alias}
         USING {tmp_table.safe_table_identifier} AS {_source_alias}
         ON {partition_by_sql_statement}
 
         WHEN MATCHED THEN UPDATE SET *
         WHEN NOT MATCHED THEN INSERT *
-    """
+        """)
     try:
         client.sql(merge_sql_query).wait()
     finally:

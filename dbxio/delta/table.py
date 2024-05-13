@@ -51,8 +51,17 @@ class TableAttributes:
     )
 
 
-def _table_schema_converter(schema: Union[list[dict[str, BaseType]], TableSchema]) -> TableSchema:
+def _table_schema_converter(schema: Union[dict[str, BaseType], list[dict[str, BaseType]], TableSchema]) -> TableSchema:
     return TableSchema.from_obj(schema)
+
+
+def _table_identifier_validator(instance, attribute, value):
+    if len(value.split('.')) != 3:
+        raise ValueError(
+            "It's not allowed to create/or use tables from default "
+            f'database (got {value}). Please specify table path in the following format: '
+            '<catalog>.<schema>.<table_name>'
+        )
 
 
 @attrs.define(slots=True)
@@ -61,7 +70,12 @@ class Table:
     Represents a table in Databricks Unity Catalog. Used to define views as well as tables.
     """
 
-    _table_identifier: str = attrs.field(validator=attrs.validators.instance_of(str), alias='table_identifier')
+    table_identifier: str = attrs.field(
+        validator=[
+            attrs.validators.instance_of(str),
+            _table_identifier_validator,
+        ]
+    )
     table_format: TableFormat = attrs.field(
         default=TableFormat.DELTA,
         validator=attrs.validators.instance_of(TableFormat),
@@ -70,10 +84,9 @@ class Table:
         default=Materialization.Table,
         validator=attrs.validators.instance_of(Materialization),
     )
-    _table_schema: Optional[Union[list[dict[str, BaseType]], TableSchema]] = attrs.field(
+    schema: Optional[Union[dict[str, BaseType], list[dict[str, BaseType]], TableSchema]] = attrs.field(
         default=None,
         converter=_table_schema_converter,
-        alias='schema',
     )
     attributes: TableAttributes = attrs.field(factory=TableAttributes)
 
@@ -85,20 +98,6 @@ class Table:
             return Table(table_identifier=obj)
 
     @property
-    def table_identifier(self):
-        return self._table_identifier
-
-    @table_identifier.setter
-    def table_identifier(self, new_table_identifier: str) -> None:
-        assert len(new_table_identifier.split('.')) == 3, (
-            "It's not allowed to create/or use tables from default "
-            f'database (got {new_table_identifier}). Please specify table path in the following format: '
-            '<catalog>.<schema>.<table_name>'
-        )
-
-        self._table_identifier = new_table_identifier
-
-    @property
     def safe_table_identifier(self):
         """
         Returns table identifier with special characters replaced with underscores and wrapped in backticks.
@@ -107,14 +106,6 @@ class Table:
             str.maketrans('!"#$%&\'()*+,/:;<=>?@[\\]^`{|}~', '_____________________________')
         )
         return '.'.join([f'`{ti_part}`' for ti_part in trunc_ti.split('.')])
-
-    @property
-    def schema(self):
-        return self._table_schema
-
-    @schema.setter
-    def schema(self, new_schema: Union[list[dict[str, BaseType]], TableSchema]):
-        self._table_schema = TableSchema.from_obj(new_schema)
 
     @property
     def is_unmanaged(self) -> bool:

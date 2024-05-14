@@ -25,11 +25,22 @@ class BaseAuthProvider(ABC):
     The authentication provider is responsible for fetching credentials to Databricks.
     """
 
-    cluster_type: ClusterType
-    az_cred_provider: AZ_CRED_PROVIDER_TYPE
-    semi_configured_credentials: Optional[SemiConfiguredClusterCredentials]
-
     def __init__(self, **kwargs):
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def cluster_type(self) -> ClusterType:
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def az_cred_provider(self) -> AZ_CRED_PROVIDER_TYPE:
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def semi_configured_credentials(self) -> Optional[SemiConfiguredClusterCredentials]:
         raise NotImplementedError
 
     @abstractmethod
@@ -195,6 +206,9 @@ class BareAuthProvider(BaseAuthProvider):
     server_hostname: str = attrs.field(validator=attrs.validators.instance_of(str))
     http_path: str = attrs.field(validator=attrs.validators.instance_of(str))
     cluster_type: ClusterType = attrs.field(validator=attrs.validators.instance_of(ClusterType))
+    az_cred_provider: AZ_CRED_PROVIDER_TYPE = attrs.field(factory=DefaultAzureCredential)
+
+    semi_configured_credentials: None = attrs.field(default=None, init=False)
 
     @cache
     def get_credentials(self, **kwargs) -> ClusterCredentials:

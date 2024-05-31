@@ -6,7 +6,7 @@ from databricks.sdk.service.sql import ExecuteStatementResponse, ResultManifest,
 from deepdiff import DeepDiff
 from pytest import fixture
 
-from dbxio.delta.sql_utils import ODBC_BATCH_SIZE_TO_FETCH, _FutureODBCResult
+from dbxio.sql.results import ODBC_BATCH_SIZE_TO_FETCH, _FutureODBCResult
 from tests.mocks.odbc import MOCK_ROW, MockConnection, MockCursor
 
 

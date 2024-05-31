@@ -1,5 +1,7 @@
 import datetime
 
+import numpy as np
+
 from dbxio import types
 
 
@@ -9,6 +11,9 @@ def test_tinyint():
     assert types.TinyIntType().fit(-1)
     assert types.TinyIntType().fit(127)
     assert types.TinyIntType().fit(-128)
+    assert types.TinyIntType().fit(np.int8(0))
+    assert types.TinyIntType().fit(np.int8(127))
+    assert types.TinyIntType().fit(np.int8(-127))
 
     assert not types.TinyIntType().fit(1000)
     assert not types.TinyIntType().fit(-1000)
@@ -22,6 +27,9 @@ def test_tinyint():
     assert types.TinyIntType().serialize(127) == '127Y'
     assert types.TinyIntType().serialize(-128) == '-128Y'
     assert types.TinyIntType().serialize(None) == 'NULL'
+    assert types.TinyIntType().serialize(np.int8(0)) == '0Y'
+    assert types.TinyIntType().serialize(np.int8(127)) == '127Y'
+    assert types.TinyIntType().serialize(np.int8(-127)) == '-127Y'
 
     assert types.TinyIntType().deserialize('1Y') == 1
     assert types.TinyIntType().deserialize('0Y') == 0
@@ -37,6 +45,9 @@ def test_smallint():
     assert types.SmallIntType().fit(-1)
     assert types.SmallIntType().fit(32767)
     assert types.SmallIntType().fit(-32768)
+    assert types.SmallIntType().fit(np.int16(0))
+    assert types.SmallIntType().fit(np.int16(32767))
+    assert types.SmallIntType().fit(np.int16(-32768))
 
     assert not types.SmallIntType().fit(100000)
     assert not types.SmallIntType().fit(-100000)
@@ -50,6 +61,9 @@ def test_smallint():
     assert types.SmallIntType().serialize(32767) == '32767S'
     assert types.SmallIntType().serialize(-32768) == '-32768S'
     assert types.SmallIntType().serialize(None) == 'NULL'
+    assert types.SmallIntType().serialize(np.int16(0)) == '0S'
+    assert types.SmallIntType().serialize(np.int16(32767)) == '32767S'
+    assert types.SmallIntType().serialize(np.int16(-32767)) == '-32767S'
 
     assert types.SmallIntType().deserialize('1S') == 1
     assert types.SmallIntType().deserialize('0S') == 0
@@ -65,6 +79,9 @@ def test_int():
     assert types.IntType().fit(-1)
     assert types.IntType().fit(2147483647)
     assert types.IntType().fit(-2147483648)
+    assert types.IntType().fit(np.int32(0))
+    assert types.IntType().fit(np.int32(2147483647))
+    assert types.IntType().fit(np.int32(-2147483648))
 
     assert not types.IntType().fit(10000000000)
     assert not types.IntType().fit(-10000000000)
@@ -78,6 +95,9 @@ def test_int():
     assert types.IntType().serialize(2147483647) == '2147483647'
     assert types.IntType().serialize(-2147483648) == '-2147483648'
     assert types.IntType().serialize(None) == 'NULL'
+    assert types.IntType().serialize(np.int32(0)) == '0'
+    assert types.IntType().serialize(np.int32(2147483647)) == '2147483647'
+    assert types.IntType().serialize(np.int32(-2147483647)) == '-2147483647'
 
     assert types.IntType().deserialize('1') == 1
     assert types.IntType().deserialize('0') == 0
@@ -93,6 +113,9 @@ def test_bigint():
     assert types.BigIntType().fit(-1)
     assert types.BigIntType().fit(9223372036854775807)
     assert types.BigIntType().fit(-9223372036854775808)
+    assert types.BigIntType().fit(np.int64(0))
+    assert types.BigIntType().fit(np.int64(9223372036854775807))
+    assert types.BigIntType().fit(np.int64(-9223372036854775808))
 
     assert not types.BigIntType().fit(100000000000000000000)
     assert not types.BigIntType().fit(-100000000000000000000)
@@ -106,6 +129,9 @@ def test_bigint():
     assert types.BigIntType().serialize(9223372036854775807) == '9223372036854775807L'
     assert types.BigIntType().serialize(-9223372036854775808) == '-9223372036854775808L'
     assert types.BigIntType().serialize(None) == 'NULL'
+    assert types.BigIntType().serialize(np.int64(0)) == '0L'
+    assert types.BigIntType().serialize(np.int64(9223372036854775807)) == '9223372036854775807L'
+    assert types.BigIntType().serialize(np.int64(-9223372036854775807)) == '-9223372036854775807L'
 
     assert types.BigIntType().deserialize('1L') == 1
     assert types.BigIntType().deserialize('0L') == 0
@@ -156,6 +182,11 @@ def test_float():
     assert types.FloatType().fit(-1.175e-37)
     assert types.FloatType().fit(1.175e-37)
     assert types.FloatType().fit(3.402e38)
+    assert types.FloatType().fit(np.float32(0))
+    assert types.FloatType().fit(np.float32(1.1))
+    assert types.FloatType().fit(np.float32(-1.1))
+    assert types.FloatType().fit(np.float32(-3.401e38))
+    assert types.FloatType().fit(np.float32(+3.401e38))
 
     assert not types.FloatType().fit('a')
     assert not types.FloatType().fit(None)
@@ -191,6 +222,10 @@ def test_double():
     assert types.DoubleType().fit(-2.225e-307)
     assert types.DoubleType().fit(+2.225e-307)
     assert types.DoubleType().fit(+1.79769e308)
+    assert types.DoubleType().fit(np.float64(-1.79769e308))
+    assert types.DoubleType().fit(np.float64(-2.225e-307))
+    assert types.DoubleType().fit(np.float64(+2.225e-307))
+    assert types.DoubleType().fit(np.float64(+1.79769e308))
 
     assert not types.DoubleType().fit('a')
     assert not types.DoubleType().fit(None)
@@ -203,6 +238,10 @@ def test_double():
     assert types.DoubleType().serialize(None) == 'NULL'
     assert types.DoubleType().serialize(float('inf')) == "double('inf')"
     assert types.DoubleType().serialize(float('-inf')) == "double('-inf')"
+    assert types.DoubleType().serialize(np.float64(1.1)) == '1.1D'
+    assert types.DoubleType().serialize(np.float64(-1.1)) == '-1.1D'
+    assert types.DoubleType().serialize(np.float64(-1.79769e308)) == '-1.79769e+308D'
+    assert types.DoubleType().serialize(np.float64(-2.225e-307)) == '-2.225e-307D'
 
     assert types.DoubleType().deserialize('1D') == 1
     assert types.DoubleType().deserialize('0D') == 0

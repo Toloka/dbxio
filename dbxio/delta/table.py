@@ -4,7 +4,7 @@ from typing import Optional, Union
 import attrs
 
 from dbxio.delta.table_schema import TableSchema
-from dbxio.delta.types import BaseType
+from dbxio.sql.types import BaseType
 
 
 class TableType(enum.Enum):

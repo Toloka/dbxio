@@ -1,4 +1,3 @@
-import logging
 from abc import ABC, abstractmethod
 from functools import cache
 from typing import Optional, Union
@@ -17,6 +16,9 @@ from dbxio.core.auth import (
 )
 from dbxio.core.exceptions import InsufficientCredentialsError, UnavailableAuthError
 from dbxio.utils.databricks import ClusterType
+from dbxio.utils.logging import get_logger
+
+logger = get_logger()
 
 
 class BaseAuthProvider(ABC):
@@ -103,7 +105,7 @@ class ClusterEnvAuthProvider(BaseAuthProvider):
         try:
             return get_local_variables(self.az_cred_provider, self.semi_configured_credentials)
         except (TypeError, ValueError):
-            logging.debug('ClusterEnvAuthProvider is not available. Not all environment variables are configured.')
+            logger.debug('ClusterEnvAuthProvider is not available. Not all environment variables are configured.')
             raise InsufficientCredentialsError
 
 
@@ -129,14 +131,14 @@ class ClusterAirflowAuthProvider(BaseAuthProvider):
     ) -> ClusterCredentials:
         try:
             if not check_is_airflow_installed():
-                logging.debug('ClusterAirflowAuthProvider is not available. Airflow is not installed.')
+                logger.debug('ClusterAirflowAuthProvider is not available. Airflow is not installed.')
                 raise InsufficientCredentialsError
             return get_airflow_variables(self.cluster_type, self.semi_configured_credentials)
         except TypeError:
-            logging.debug('ClusterAirflowAuthProvider is not available. Some environment variables are not configured.')
+            logger.debug('ClusterAirflowAuthProvider is not available. Some environment variables are not configured.')
             raise InsufficientCredentialsError
         except KeyError:
-            logging.debug('ClusterAirflowAuthProvider is not available. Airflow variables are not configured.')
+            logger.debug('ClusterAirflowAuthProvider is not available. Airflow variables are not configured.')
             raise InsufficientCredentialsError
 
 

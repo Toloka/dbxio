@@ -1,5 +1,6 @@
 import logging
 import os.path
+import uuid
 from pathlib import Path
 from textwrap import dedent
 from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Union
@@ -9,13 +10,16 @@ from databricks.sql import ServerOperationError
 from dbxio.blobs.block_upload import upload_file
 from dbxio.blobs.parquet import create_pa_table, create_tmp_parquet, pa_table2parquet
 from dbxio.delta.parsers import infer_schema
-from dbxio.delta.query import ConstDatabricksQuery
-from dbxio.delta.sql_utils import _FutureBaseResult
 from dbxio.delta.table import Table, TableFormat
+from dbxio.sql.query import ConstDatabricksQuery
+from dbxio.sql.results import _FutureBaseResult
 from dbxio.utils.blobs import blobs_registries, get_blob_servie_client
+from dbxio.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from dbxio.core import DbxIOClient
+
+logger = get_logger()
 
 
 def exists_table(table: Union[str, Table], client: 'DbxIOClient') -> bool:
@@ -158,7 +162,7 @@ def write_table(
     query_size_in_bytes = len(_sql_query.encode('utf-8'))
     if query_size_in_bytes > 10 * 2**20:
         # TODO: raise exception here
-        logging.warning(
+        logger.warning(
             f'Query size is {query_size_in_bytes / 2 ** 20} MB. '
             f'Please consider using bulk_write_table function instead of write_table.'
             f'In further versions of dbxio this function will be deprecated and removed.'
@@ -228,7 +232,7 @@ def bulk_write_table(
 
     with create_tmp_parquet(pa_table_as_bytes, dbxio_table.table_identifier, abs_client) as tmp_path:
         if not append:
-            drop_table(dbxio_table, client=client).wait()
+            drop_table(dbxio_table, client=client, force=True).wait()
         create_table(dbxio_table, client=client).wait()
 
         copy_into_table(
@@ -261,6 +265,7 @@ def bulk_write_local_files(
     p = Path(path)
     files = p.glob(f'*.{table_format.value.lower()}') if p.is_dir() else [path]
 
+    operation_uuid = str(uuid.uuid4())
     with blobs_registries(abs_client, abs_container_name) as (blobs, metablobs):
         for filename in files:
             upload_file(
@@ -268,6 +273,7 @@ def bulk_write_local_files(
                 p,
                 abs_client,
                 abs_container_name,
+                operation_uuid=operation_uuid,
                 blobs=blobs,
                 metablobs=metablobs,
                 max_concurrency=max_concurrency,
@@ -275,15 +281,17 @@ def bulk_write_local_files(
             )
 
         if not append:
-            drop_table(table, client=client).wait()
+            drop_table(table, client=client, force=True).wait()
         create_table(table, client=client).wait()
 
+        common_blob_path = str(os.path.commonpath(blobs))
+        include_files_pattern = len(blobs) > 1
         copy_into_table(
             client=client,
             table=table,
             table_format=table_format,
-            blob_path=str(os.path.commonpath(blobs)),
-            include_files_pattern=True,
+            blob_path=common_blob_path,
+            include_files_pattern=include_files_pattern,
             abs_name=abs_name,
             abs_container_name=abs_container_name,
         )
@@ -324,4 +332,106 @@ def merge_table(
     try:
         client.sql(merge_sql_query).wait()
     finally:
-        drop_table(tmp_table, client=client).wait()
+        drop_table(tmp_table, client=client, force=True).wait()
+
+
+def set_comment_on_table(
+    table: 'Union[str , Table]',
+    comment: Union[str, None],
+    client: 'DbxIOClient',
+) -> _FutureBaseResult:
+    """
+    Sets a comment on a table.
+    Description comment supports Markdown.
+
+    If the comment is None, the comment will be removed.
+    """
+    dbxio_table = Table.from_obj(table)
+    set_comment_query = dedent(
+        f"""COMMENT ON TABLE {dbxio_table.safe_table_identifier} IS {f'"{comment}"' if comment else 'NULL'}"""
+    )
+
+    return client.sql(set_comment_query)
+
+
+def unset_comment_on_table(table: 'Union[str , Table]', client: 'DbxIOClient') -> _FutureBaseResult:
+    """
+    Unsets the comment on a table.
+    """
+    return set_comment_on_table(table=table, comment=None, client=client)
+
+
+def get_comment_on_table(table: 'Union[str , Table]', client: 'DbxIOClient') -> Union[str, None]:
+    """
+    Returns the comment on a table.
+    """
+    dbxio_table = Table.from_obj(table)
+    table_catalog, table_schema, table_name = dbxio_table.table_identifier.split('.')
+    information_schema_query = dedent(f"""
+    select comment
+    from system.information_schema.tables
+    where
+        table_catalog = '{table_catalog}'
+        and table_schema = '{table_schema}'
+        and table_name = '{table_name}'
+    """)
+
+    with client.sql(information_schema_query) as result:
+        for row in result:
+            return row['comment']
+
+    return None
+
+
+def set_tags_on_table(table: 'Union[str , Table]', tags: dict[str, str], client: 'DbxIOClient') -> _FutureBaseResult:
+    """
+    Sets tags on a table.
+    Each tag is a key-value pair of strings.
+    """
+    assert tags, 'Tags must be a non-empty dictionary.'
+
+    dbxio_table = Table.from_obj(table)
+    set_tags_query = dedent(f"""
+    ALTER TABLE {dbxio_table.safe_table_identifier}
+    SET TAGS ({', '.join([f'"{k}" = "{v}"' for k, v in tags.items()])})
+    """)
+
+    return client.sql(set_tags_query)
+
+
+def unset_tags_on_table(table: 'Union[str , Table]', tags: list[str], client: 'DbxIOClient') -> _FutureBaseResult:
+    """
+    Unsets tags on a table.
+    """
+    assert tags, 'Tags must be a non-empty list.'
+
+    dbxio_table = Table.from_obj(table)
+    unset_tags_query = dedent(f"""
+    ALTER TABLE {dbxio_table.safe_table_identifier}
+    UNSET TAGS ({', '.join([f'"{tag}"' for tag in tags])})
+    """)
+
+    return client.sql(unset_tags_query)
+
+
+def get_tags_on_table(table: 'Union[str , Table]', client: 'DbxIOClient') -> dict[str, str]:
+    """
+    Returns the tags on a table.
+    """
+    dbxio_table = Table.from_obj(table)
+    catalog_name, schema_name, table_name = dbxio_table.table_identifier.split('.')
+    information_schema_query = dedent(f"""
+    select tag_name, tag_value
+    from system.information_schema.table_tags
+    where
+        catalog_name = '{catalog_name}'
+        and schema_name = '{schema_name}'
+        and table_name = '{table_name}'
+    """)
+
+    tags = {}
+    with client.sql(information_schema_query) as result:
+        for row in result:
+            tags[row['tag_name']] = row['tag_value']
+
+    return tags

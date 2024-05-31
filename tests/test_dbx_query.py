@@ -1,6 +1,6 @@
 from databricks.sdk.service.sql import StatementParameterListItem
 
-from dbxio.delta.query import ParametrizedDatabricksQuery
+from dbxio.sql.query import ParametrizedDatabricksQuery
 from dbxio.utils.databricks import ClusterType
 
 

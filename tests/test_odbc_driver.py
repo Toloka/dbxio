@@ -7,8 +7,8 @@ from deepdiff import DeepDiff
 from pytest import fixture
 
 from dbxio.core.auth import ClusterCredentials
-from dbxio.delta.sql_driver import ODBCDriver
-from dbxio.delta.sql_utils import ODBC_BATCH_SIZE_TO_FETCH
+from dbxio.sql.results import ODBC_BATCH_SIZE_TO_FETCH
+from dbxio.sql.sql_driver import ODBCDriver
 from dbxio.utils.databricks import ClusterType
 from tests.mocks.odbc import MOCK_ROW, TOTAL_MOCK_RECORDS, mock_dbx_connect
 

@@ -1,19 +1,24 @@
-import logging
 import os
+import uuid
 from pathlib import Path
+from textwrap import dedent
 from typing import TYPE_CHECKING, Union
 
 import attrs
 from databricks.sdk.service.catalog import VolumeType
 
 from dbxio.blobs.block_upload import upload_file
+from dbxio.sql.results import _FutureBaseResult
 from dbxio.utils.blobs import blobs_registries, get_blob_servie_client
 from dbxio.utils.databricks import compile_full_storage_location_path, get_storage_name_from_external_location
+from dbxio.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from dbxio.core.client import DbxIOClient
 
 DEFAULT_EXTERNAL_LOCATION = 'default_external_location'
+
+logger = get_logger()
 
 
 @attrs.define(slots=True)
@@ -66,7 +71,7 @@ def create_volume(volume: Volume, client: 'DbxIOClient') -> None:
         volume_type=volume.volume_type,
         storage_location=volume.storage_location,
     )
-    logging.info(f'Volume {volume.safe_full_name} was successfully created.')
+    logger.info(f'Volume {volume.safe_full_name} was successfully created.')
 
 
 def _exists_volume(volume: Volume, client: 'DbxIOClient') -> bool:
@@ -116,6 +121,7 @@ def write_volume(
 
     blob_service_client = get_blob_servie_client(storage_name, client.credential_provider.az_cred_provider)
 
+    operation_uuid = str(uuid.uuid4())
     with blobs_registries(blob_service_client, default_external_location, keep_blobs=True) as (blobs, metablobs):
         # here all files in the path, including subdirectories, are uploaded to the blob storage.
         # only "hidden" files (those starting with a dot) are skipped
@@ -126,6 +132,7 @@ def write_volume(
                     local_path=path,
                     blob_service_client=blob_service_client,
                     container_name=default_external_location,
+                    operation_uuid=operation_uuid,
                     blobs=blobs,
                     metablobs=metablobs,
                     max_concurrency=max_concurrency,
@@ -153,3 +160,98 @@ def write_volume(
                 f'Volume {volume_name} does not exist in schema {schema_name} of catalog '
                 f'{catalog_name} and create_volume_if_not_exists is False.'
             )
+
+
+def set_tags_on_volume(volume: Volume, tags: dict[str, str], client: 'DbxIOClient') -> _FutureBaseResult:
+    """
+    Sets tags on a volume.
+    Each tag is a key-value pair of strings.
+    """
+    assert tags, 'tags must be a non-empty dictionary'
+
+    set_tags_query = dedent(f"""
+    ALTER VOLUME {volume.safe_full_name}
+    SET TAGS ({', '.join([f'"{k}" = "{v}"' for k, v in tags.items()])})
+    """)
+
+    return client.sql(set_tags_query)
+
+
+def unset_tags_on_volume(volume: Volume, tags: list[str], client: 'DbxIOClient') -> _FutureBaseResult:
+    """
+    Unsets tags on a volume.
+    """
+    assert tags, 'tags must be a non-empty list'
+
+    unset_tags_query = dedent(f"""
+    ALTER VOLUME {volume.safe_full_name}
+    UNSET TAGS ({', '.join([f'"{tag}"' for tag in tags])})
+    """)
+
+    return client.sql(unset_tags_query)
+
+
+def get_tags_on_volume(volume: Volume, client: 'DbxIOClient') -> dict[str, str]:
+    """
+    Returns the tags on a volume.
+    """
+    information_schema_query = dedent(f"""
+    select tag_name, tag_value
+    from system.information_schema.volume_tags
+    where
+        catalog_name = '{volume.catalog}'
+        and schema_name = '{volume.schema}'
+        and volume_name = '{volume.name}'
+    """)
+
+    tags = {}
+    with client.sql(information_schema_query) as result:
+        for row in result:
+            tags[row['tag_name']] = row['tag_value']
+
+    return tags
+
+
+def set_comment_on_volume(
+    volume: Volume,
+    comment: Union[str, None],
+    client: 'DbxIOClient',
+) -> _FutureBaseResult:
+    """
+    Sets a comment on a volume.
+    Description comment supports Markdown.
+
+    If the comment is None, the comment will be removed.
+    """
+    set_comment_query = dedent(
+        f"""COMMENT ON VOLUME {volume.safe_full_name} IS {f'"{comment}"' if comment else 'NULL'}"""
+    )
+
+    return client.sql(set_comment_query)
+
+
+def unset_comment_on_volume(volume: Volume, client: 'DbxIOClient') -> _FutureBaseResult:
+    """
+    Unsets the comment on a volume.
+    """
+    return set_comment_on_volume(volume=volume, comment=None, client=client)
+
+
+def get_comment_on_volume(volume: Volume, client: 'DbxIOClient') -> Union[str, None]:
+    """
+    Returns the comment on a volume.
+    """
+    information_schema_query = dedent(f"""
+    select comment
+    from system.information_schema.volumes
+    where
+        catalog_name = '{volume.catalog}'
+        and schema_name = '{volume.schema}'
+        and volume_name = '{volume.name}'
+    """)
+
+    with client.sql(information_schema_query) as result:
+        for row in result:
+            return row['comment']
+
+    return None

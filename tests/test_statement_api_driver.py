@@ -8,7 +8,7 @@ from pytest import fixture
 
 from dbxio.core.auth import ClusterCredentials
 from dbxio.core.client import DbxIOClient
-from dbxio.delta.sql_driver import StatementAPIDriver
+from dbxio.sql.sql_driver import StatementAPIDriver
 from dbxio.utils.databricks import ClusterType
 
 MOCK_STATEMENT_ID = '12345-6789-0000'
@@ -64,7 +64,7 @@ def test_sapi_driver_sql(mock1, mock2, statement_api, cluster_credentials, reque
             'https://adb_external_link_to_results',
             content=f.read(),
         )
-    with patch('dbxio.delta.sql_utils._FutureStatementApiResult.wait', return_value=None):
+    with patch('dbxio.sql.results._FutureStatementApiResult.wait', return_value=None):
         data = list(driver.sql('select * from table'))
         assert data == [{'a': 2} for _ in range(MOCK_TOTAL_CHUNK_COUNT)]
 
@@ -90,7 +90,7 @@ def test_sapi_driver_sql_to_files(mock1, mock2, statement_api, cluster_credentia
         content=arrow_stream,
     )
     with tempfile.TemporaryDirectory() as temp_dir, patch(
-        'dbxio.delta.sql_utils._FutureStatementApiResult.wait', return_value=None
+        'dbxio.sql.results._FutureStatementApiResult.wait', return_value=None
     ):
         path_to_files = driver.sql_to_files('select * from table', results_path=temp_dir)
         assert len(list(path_to_files.iterdir())) == MOCK_TOTAL_CHUNK_COUNT

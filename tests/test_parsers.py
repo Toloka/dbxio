@@ -1,12 +1,15 @@
 import unittest
 
+import numpy as np
+
 try:
     import pydantic.v1 as pydantic
 except ModuleNotFoundError:
     import pydantic
 
 from dbxio import TableSchema
-from dbxio.delta import as_dbxio_type, types
+from dbxio.delta.parsers import infer_schema
+from dbxio.sql import as_dbxio_type, types
 
 
 class TestTableSchema(unittest.TestCase):
@@ -98,6 +101,14 @@ class TestTableSchema(unittest.TestCase):
         assert isinstance(as_dbxio_type([1, 2, 3]), types.ArrayType(types.IntType()))  # noqa
         assert isinstance(as_dbxio_type({'a': 1, 'b': 2}), types.MapType(types.StringType(), types.IntType()))  # noqa
 
+    def test_as_dbxio_type_numpy(self):
+        assert isinstance(as_dbxio_type(np.int8(1)), types.IntType())  # noqa
+        assert isinstance(as_dbxio_type(np.int32(32_700)), types.IntType())  # noqa
+        assert isinstance(as_dbxio_type(np.int32(2**30)), types.IntType())  # noqa
+        assert isinstance(as_dbxio_type(np.int64(2**62)), types.BigIntType())  # noqa
+        assert isinstance(as_dbxio_type(np.float32(3.401e38)), types.FloatType())  # noqa
+        assert isinstance(as_dbxio_type(np.float64(1.79769e308)), types.DoubleType())  # noqa
+
     def test_array_parsing(self):
         import datetime
 
@@ -127,3 +138,31 @@ class TestTableSchema(unittest.TestCase):
             types.MapType(types.StringType(), types.StringType()).serialize({'a': 'b', 'c': 'd'})
             == "MAP('a', 'b', 'c', 'd')"
         )
+
+    def test_infer_schema(self):
+        record = {
+            'col_int': 1,
+            'col_string': 'foobar',
+            'col_boolean': True,
+            'col_array': [1, 2, 42],
+            'col_map': {'a': 1, 'b': 2},
+            'col_struct': {'k1': 'v1', 'k2': True, 'k3': 1.1, 'k4': 42},
+        }
+        schema = infer_schema(record)
+
+        exp_parsed_schema = {
+            'col_int': types.IntType(),
+            'col_string': types.StringType(),
+            'col_boolean': types.BooleanType(),
+            'col_array': types.ArrayType(types.IntType()),
+            'col_map': types.MapType(types.StringType(), types.IntType()),
+            'col_struct': types.StructType(
+                [
+                    ('k1', types.StringType()),
+                    ('k2', types.BooleanType()),
+                    ('k3', types.FloatType()),
+                    ('k4', types.IntType()),
+                ]
+            ),
+        }
+        self.assertDictEqual(schema.as_dict(), exp_parsed_schema)

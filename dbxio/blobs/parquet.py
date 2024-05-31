@@ -1,19 +1,21 @@
 import uuid
 from contextlib import contextmanager
-from typing import Dict, Iterator, Union
+from typing import TYPE_CHECKING, Dict, Iterator, Union
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 from azure.storage.blob import ContainerClient
 
-from dbxio.delta.table import Table
-from dbxio.delta.table_schema import TableSchema
-from dbxio.delta.types import convert_dbxio_type_to_pa_type
+from dbxio.sql.types import convert_dbxio_type_to_pa_type
+
+if TYPE_CHECKING:
+    from dbxio.delta.table import Table
+    from dbxio.delta.table_schema import TableSchema
 
 ROW_GROUP_SIZE_BYTES = 128 * 2**20
 
 
-def create_pa_table(parsed_micro_batch: Dict, schema: TableSchema) -> pa.Table:
+def create_pa_table(parsed_micro_batch: Dict, schema: 'TableSchema') -> pa.Table:
     batch_as_arrays = []
     schema_as_dict = schema.as_dict()
     for col_name, col_values in parsed_micro_batch.items():
@@ -36,7 +38,7 @@ def arrow_stream2parquet(stream: bytes) -> bytes:
 
 
 @contextmanager
-def create_tmp_parquet(data: bytes, table_identifier: Union[str, Table], client: 'ContainerClient') -> Iterator[str]:
+def create_tmp_parquet(data: bytes, table_identifier: Union[str, 'Table'], client: 'ContainerClient') -> Iterator[str]:
     random_part = uuid.uuid4()
     ti = table_identifier if isinstance(table_identifier, str) else table_identifier.table_identifier
     translated_table_identifier = ti.translate(

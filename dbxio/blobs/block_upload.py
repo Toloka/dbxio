@@ -1,12 +1,11 @@
 import hashlib
-import logging
-import os
-import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Union
 
 from azure.core.exceptions import ResourceExistsError
 from azure.storage.blob import BlobLeaseClient, BlobType
+
+from dbxio.utils.logging import get_logger
 
 _HASHSUM_SUFFIX = '_HASHSUM'
 _SUCCESS_SUFFIX = '_SUCCESS'
@@ -15,14 +14,12 @@ _LOCK_SUFFIX = '_LOCK'
 if TYPE_CHECKING:
     from azure.storage.blob import BlobServiceClient, ContainerClient
 
+logger = get_logger()
 
-def _local_path_to_blob_name(file_path: Path, local_path: Path) -> str:
-    user = os.environ.get('USER')
-    if not user:
-        logging.debug('USER environment variable is not set. Using random UUID as a user.')
-        user = f'user__{uuid.uuid4()}'
+
+def _local_path_to_blob_name(file_path: Path, local_path: Path, operation_uuid: str) -> str:
     relative_path = file_path.relative_to(local_path) if file_path != local_path else file_path.name
-    return f'{user}/{relative_path}'
+    return f'{operation_uuid}/{relative_path}'
 
 
 def _get_file_hash(file_path: Path) -> str:
@@ -40,7 +37,7 @@ def _blob_exists(container_client: 'ContainerClient', blob_name: str, target_has
     """
     blobs = [blob.name for blob in container_client.list_blobs(name_starts_with=blob_name)]
     if f'{blob_name}{_SUCCESS_SUFFIX}' not in blobs or f'{blob_name}{_HASHSUM_SUFFIX}' not in blobs:
-        logging.debug(f'Blob {blob_name} does not exist (no SUCCESS or HASHSUM file)')
+        logger.debug(f'Blob {blob_name} does not exist (no SUCCESS or HASHSUM file)')
         return False
     saved_hashsum = container_client.download_blob(f'{blob_name}{_HASHSUM_SUFFIX}').readall().decode()
     return saved_hashsum == target_hashsum
@@ -62,7 +59,7 @@ def _lock_blob(blob_name: str, blob_service_client: 'BlobServiceClient', contain
             raise e
     blob_client.acquire_lease()
 
-    logging.debug(f'Lock is acquired for {blob_name}')
+    logger.debug(f'Lock is acquired for {blob_name}')
 
 
 def upload_file(
@@ -72,6 +69,7 @@ def upload_file(
     container_name: str,
     blobs: list[str],
     metablobs: list[str],
+    operation_uuid: str,
     max_concurrency: int = 1,
     force: bool = False,
 ) -> str:
@@ -83,10 +81,10 @@ def upload_file(
     path = Path(path)
     local_path = Path(local_path)
     container_client = blob_service_client.get_container_client(container_name)
-    logging.debug(f'Using {max_concurrency} threads for uploading {path}')
+    logger.debug(f'Using {max_concurrency} threads for uploading {path}')
 
     file_hash = _get_file_hash(path)
-    blob_name = _local_path_to_blob_name(path, local_path)
+    blob_name = _local_path_to_blob_name(path, local_path, operation_uuid)
     metablobs.append(f'{blob_name}{_LOCK_SUFFIX}')
     metablobs.append(f'{blob_name}{_SUCCESS_SUFFIX}')
     metablobs.append(f'{blob_name}{_HASHSUM_SUFFIX}')
@@ -109,10 +107,10 @@ def upload_file(
         )
 
     container_client.upload_blob(f'{blob_name}{_SUCCESS_SUFFIX}', b'', overwrite=True)
-    logging.debug(f'SUCCESS file is uploaded for {blob_name}')
+    logger.debug(f'SUCCESS file is uploaded for {blob_name}')
     container_client.upload_blob(f'{blob_name}{_HASHSUM_SUFFIX}', file_hash.encode(), overwrite=True)
-    logging.debug(f'HASHSUM file is uploaded for {blob_name}')
+    logger.debug(f'HASHSUM file is uploaded for {blob_name}')
 
-    logging.info(f'Successfully uploaded {path} to {container_name}/{blob_name}')
+    logger.info(f'Successfully uploaded {path} to {container_name}/{blob_name}')
 
     return blob_name

@@ -7,9 +7,9 @@ from azure.identity import AzureCliCredential
 from databricks.sdk import StatementExecutionAPI, WorkspaceClient
 
 from dbxio.core.credentials import AZ_CRED_PROVIDER_TYPE, BaseAuthProvider, DefaultCredentialProvider
-from dbxio.delta.query import BaseDatabricksQuery
-from dbxio.delta.sql_driver import SQLDriver, get_sql_driver
-from dbxio.delta.sql_utils import _FutureBaseResult
+from dbxio.sql.query import BaseDatabricksQuery
+from dbxio.sql.results import _FutureBaseResult
+from dbxio.sql.sql_driver import SQLDriver, get_sql_driver
 from dbxio.utils.databricks import ClusterType
 
 

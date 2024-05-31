@@ -6,7 +6,7 @@ import pyarrow as pa
 
 from dbxio.blobs.parquet import create_pa_table
 from dbxio.delta.table_schema import TableSchema
-from dbxio.delta.types import ArrayType, IntType, JSONType, StringType
+from dbxio.sql.types import ArrayType, IntType, JSONType, StringType
 
 
 def test_create_pa_table():

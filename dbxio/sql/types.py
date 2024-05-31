@@ -1,6 +1,5 @@
 import datetime
 import json
-import logging
 import math
 from abc import ABCMeta, abstractmethod
 from decimal import Decimal
@@ -12,6 +11,9 @@ import pyarrow as pa
 from decorator import decorator
 
 from dbxio.core.exceptions import DbxIOTypeError
+from dbxio.utils.logging import get_logger
+
+logger = get_logger()
 
 
 @decorator
@@ -508,7 +510,7 @@ class IntervalType(BaseType):
     """
 
     def fit(self, obj) -> bool:
-        logging.warning('INTERVAL type is not yet fully supported. Will be used as-is!')
+        logger.warning('INTERVAL type is not yet fully supported. Will be used as-is!')
         try:
             str(obj)
             return True
@@ -556,7 +558,7 @@ class MapType(BaseType):
 
     @nullable
     def deserialize(self, obj):
-        logging.warning('MAP type with complex inner types is not supported for deserialization. Will be used as-is!')
+        logger.warning('MAP type with complex inner types is not supported for deserialization. Will be used as-is!')
         if isinstance(obj, str) and obj.startswith('MAP'):
             arr = list(map(json.loads, obj.strip('MAP()').split(', ')))
             if len(arr) % 2:
@@ -670,6 +672,8 @@ ComplexDataTypes = (ArrayType, MapType, StructType)
 
 
 def as_dbxio_type(value: Any) -> BaseType:
+    if isinstance(value, bool) and BooleanType().fit(value):
+        return BooleanType()
     if isinstance(value, (int, np.integer)):
         for int_type in GroupsPrimaryDataTypes.INTEGER:
             type_ = int_type()
@@ -685,8 +689,6 @@ def as_dbxio_type(value: Any) -> BaseType:
         for dtm_type in GroupsPrimaryDataTypes.DATETIME:
             if dtm_type().fit(value):
                 return dtm_type()
-    if isinstance(value, bool) and BooleanType().fit(value):
-        return BooleanType()
     if isinstance(value, list):
         value_type = as_dbxio_type(value[0])
         if ArrayType(value_type).fit(value):

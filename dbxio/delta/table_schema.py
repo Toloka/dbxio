@@ -6,7 +6,7 @@ try:
 except ModuleNotFoundError:
     import pydantic  # type: ignore
 
-from dbxio.delta.types import BaseType
+from dbxio.sql.types import BaseType
 
 
 class ColumnSpec(pydantic.BaseModel):

@@ -1,45 +1,36 @@
 import unittest
+import uuid
+from tempfile import TemporaryDirectory
 from textwrap import dedent
 from unittest.mock import patch
 
+import pytest
+
 from dbxio.core import DbxIOClient
-from dbxio.delta import types
 from dbxio.delta.table import Table, TableFormat
 from dbxio.delta.table_commands import (
+    bulk_write_local_files,
+    bulk_write_table,
     copy_into_table,
     create_table,
     drop_table,
     exists_table,
+    get_comment_on_table,
+    get_tags_on_table,
     merge_table,
     read_table,
     save_table_to_files,
+    set_comment_on_table,
+    set_tags_on_table,
+    unset_comment_on_table,
+    unset_tags_on_table,
     write_table,
 )
 from dbxio.delta.table_schema import TableSchema
+from dbxio.sql import types
 from dbxio.utils.databricks import ClusterType
-from tests.mocks.azure import MockDefaultAzureCredential
-
-
-def flatten_query(query):
-    return ' '.join([s.strip() for s in query.splitlines()])
-
-
-def sql_mock(sql):
-    """
-    Returns context manager that returns one test record on __enter__ call
-    """
-
-    class MockSql:
-        def __enter__(self):
-            return [{'a': 1, 'b': 2}]
-
-        def __exit__(self, exc_type, exc_val, exc_tb):
-            pass
-
-        def wait(self):
-            pass
-
-    return MockSql()
+from tests.mocks.azure import MockBlobLeaseClient, MockBlobServiceClient, MockDefaultAzureCredential
+from tests.mocks.sql import flatten_query, sql_mock
 
 
 class TestTableCommands(unittest.TestCase):
@@ -192,4 +183,179 @@ class TestTableCommands(unittest.TestCase):
 
         # check that it tries to drop temp table
         observed_query = mock_sql.call_args_list[3][0][0]
-        assert observed_query == 'DROP TABLE `catalog`.`schema`.`table__dbxio_tmp`'
+        assert observed_query == 'DROP TABLE IF EXISTS `catalog`.`schema`.`table__dbxio_tmp`'
+
+    @patch.object(DbxIOClient, 'sql', side_effect=sql_mock)
+    def test_set_comment_on_table(self, mock_sql):
+        set_comment_on_table(self.table, 'test_comment', self.client)
+        mock_sql.assert_called_once_with('''COMMENT ON TABLE `catalog`.`schema`.`table` IS "test_comment"''')
+
+    @patch.object(DbxIOClient, 'sql', side_effect=sql_mock)
+    def test_set_comment_null_on_table(self, mock_sql):
+        set_comment_on_table(self.table, None, self.client)
+        mock_sql.assert_called_once_with('COMMENT ON TABLE `catalog`.`schema`.`table` IS NULL')
+
+    @patch.object(DbxIOClient, 'sql', side_effect=sql_mock)
+    def test_unset_comment_on_table(self, mock_sql):
+        unset_comment_on_table(self.table, self.client)
+        mock_sql.assert_called_once_with('COMMENT ON TABLE `catalog`.`schema`.`table` IS NULL')
+
+    @patch.object(DbxIOClient, 'sql', side_effect=sql_mock)
+    def test_get_comment_on_table(self, mock_sql):
+        get_comment_on_table(self.table, self.client)
+        expected_query = dedent("""
+        select comment
+        from system.information_schema.tables
+        where
+            table_catalog = 'catalog'
+            and table_schema = 'schema'
+            and table_name = 'table'
+        """)
+        observed_query = mock_sql.call_args[0][0]
+        assert flatten_query(observed_query) == flatten_query(expected_query)
+
+    @patch.object(DbxIOClient, 'sql', side_effect=sql_mock)
+    def test_set_tags_on_table(self, mock_sql):
+        set_tags_on_table(self.table, {'tag1': 'value1', 'tag2': 'value2'}, self.client)
+        expected_query = dedent("""
+        ALTER TABLE `catalog`.`schema`.`table`
+        SET TAGS ("tag1" = "value1", "tag2" = "value2")
+        """)
+        observed_query = mock_sql.call_args[0][0]
+        assert flatten_query(observed_query) == flatten_query(expected_query)
+
+    @patch.object(DbxIOClient, 'sql', side_effect=sql_mock)
+    def test_set_tags_on_table_non_stings(self, mock_sql):
+        set_tags_on_table(self.table, {'tag1': 1, 'tag2': 2, 1: [1, 2, 3]}, self.client)
+        expected_query = dedent("""
+        ALTER TABLE `catalog`.`schema`.`table`
+        SET TAGS ("tag1" = "1", "tag2" = "2", "1" = "[1, 2, 3]")
+        """)
+        observed_query = mock_sql.call_args[0][0]
+        assert flatten_query(observed_query) == flatten_query(expected_query)
+
+    def test_set_tags_on_table_empty_dict(self):
+        with pytest.raises(AssertionError):
+            set_tags_on_table(self.table, {}, self.client)
+
+    @patch.object(DbxIOClient, 'sql', side_effect=sql_mock)
+    def test_unset_tags_on_table(self, mock_sql):
+        unset_tags_on_table(self.table, ['tag1', 'tag2'], self.client)
+        expected_query = dedent("""
+        ALTER TABLE `catalog`.`schema`.`table`
+        UNSET TAGS ("tag1", "tag2")
+        """)
+        observed_query = mock_sql.call_args[0][0]
+        assert flatten_query(observed_query) == flatten_query(expected_query)
+
+    def test_unset_tags_on_table_empty_list(self):
+        with pytest.raises(AssertionError):
+            unset_tags_on_table(self.table, [], self.client)
+
+    @patch.object(DbxIOClient, 'sql', side_effect=sql_mock)
+    def test_get_tags_on_table(self, mock_sql):
+        get_tags_on_table(self.table, self.client)
+        expected_query = dedent("""
+        select tag_name, tag_value
+        from system.information_schema.table_tags
+        where
+            catalog_name = 'catalog'
+            and schema_name = 'schema'
+            and table_name = 'table'
+        """)
+        observed_query = mock_sql.call_args[0][0]
+        assert flatten_query(observed_query) == flatten_query(expected_query)
+
+    @patch('dbxio.utils.blobs.BlobServiceClient', side_effect=MockBlobServiceClient)
+    @patch.object(DbxIOClient, 'sql', side_effect=sql_mock)
+    @patch.object(uuid, 'uuid4', side_effect=lambda: 'test_uuid')
+    def test_bulk_write_table(self, mock_uuid, mock_sql, mock_blob_service_client):
+        bulk_write_table(
+            table=self.table,
+            new_records=[{'a': 1, 'b': 2}, {'a': 3, 'b': 4}],
+            client=self.client,
+            abs_name='test_abs_name',
+            abs_container_name='test_abs_container_name',
+        )
+        expected_query = dedent("""
+        COPY INTO `catalog`.`schema`.`table`
+        FROM "abfss://test_abs_container_name@test_abs_name.dfs.core.windows.net/catalog_schema_table__dbxio_tmp__test_uuid.parquet"
+        FILEFORMAT = PARQUET
+
+        FORMAT_OPTIONS ("mergeSchema" = "true")
+        COPY_OPTIONS ("mergeSchema" = "true")
+        """)
+
+        observed_query = mock_sql.call_args[0][0]
+        assert flatten_query(observed_query) == flatten_query(expected_query)
+
+    @patch('dbxio.utils.blobs.BlobServiceClient', side_effect=MockBlobServiceClient)
+    @patch('dbxio.utils.blobs.BlobLeaseClient', side_effect=MockBlobLeaseClient)
+    @patch.object(DbxIOClient, 'sql', side_effect=sql_mock)
+    @patch.object(uuid, 'uuid4', side_effect=lambda: 'test_uuid')
+    @patch.dict('os.environ', {'USER': ''})
+    def test_bulk_write_local_files(
+        self,
+        mock_uuid,
+        mock_sql,
+        mock_blob_lease_client,
+        mock_blob_service_client,
+    ):
+        with TemporaryDirectory() as tmp_dir:
+            for i in range(10):
+                with open(f'{tmp_dir}/test_file_{i}.parquet', 'w') as f:
+                    f.write('test_data')
+            bulk_write_local_files(
+                table=self.table,
+                path=tmp_dir,
+                table_format=TableFormat.PARQUET,
+                client=self.client,
+                abs_name='test_abs_name',
+                abs_container_name='test_abs_container_name',
+            )
+        expected_query = dedent("""
+        COPY INTO `catalog`.`schema`.`table`
+        FROM "abfss://test_abs_container_name@test_abs_name.dfs.core.windows.net/test_uuid"
+        FILEFORMAT = PARQUET
+        PATTERN = '*.parquet'
+        FORMAT_OPTIONS ("mergeSchema" = "true")
+        COPY_OPTIONS ("mergeSchema" = "true")
+        """)
+
+        observed_query = mock_sql.call_args[0][0]
+        assert flatten_query(observed_query) == flatten_query(expected_query)
+
+    @patch('dbxio.utils.blobs.BlobServiceClient', side_effect=MockBlobServiceClient)
+    @patch('dbxio.utils.blobs.BlobLeaseClient', side_effect=MockBlobLeaseClient)
+    @patch.object(DbxIOClient, 'sql', side_effect=sql_mock)
+    @patch.object(uuid, 'uuid4', side_effect=lambda: 'test_uuid')
+    @patch.dict('os.environ', {'USER': ''})
+    def test_bulk_write_local_files_one_parquet_file(
+        self,
+        mock_uuid,
+        mock_sql,
+        mock_blob_lease_client,
+        mock_blob_service_client,
+    ):
+        with TemporaryDirectory() as tmp_dir:
+            with open(f'{tmp_dir}/test_file.parquet', 'w') as f:
+                f.write('test_data')
+            bulk_write_local_files(
+                table=self.table,
+                path=tmp_dir,
+                table_format=TableFormat.PARQUET,
+                client=self.client,
+                abs_name='test_abs_name',
+                abs_container_name='test_abs_container_name',
+            )
+        expected_query = dedent("""
+        COPY INTO `catalog`.`schema`.`table`
+        FROM "abfss://test_abs_container_name@test_abs_name.dfs.core.windows.net/test_uuid/test_file.parquet"
+        FILEFORMAT = PARQUET
+
+        FORMAT_OPTIONS ("mergeSchema" = "true")
+        COPY_OPTIONS ("mergeSchema" = "true")
+        """)
+
+        observed_query = mock_sql.call_args[0][0]
+        assert flatten_query(observed_query) == flatten_query(expected_query)

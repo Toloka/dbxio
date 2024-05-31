@@ -8,6 +8,7 @@ from dbxio.utils.env import (
     DBX_FORCE_LOCAL,
 )
 from dbxio.utils.http import get_session
+from dbxio.utils.logging import get_logger
 
 __all__ = [
     'ClusterType',
@@ -21,4 +22,5 @@ __all__ = [
     'blobs_registries',
     'blobs_gc',
     'get_session',
+    'get_logger',
 ]

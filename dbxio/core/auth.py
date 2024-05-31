@@ -1,4 +1,3 @@
-import logging
 import os
 import time
 from typing import Union
@@ -16,6 +15,7 @@ from dbxio.utils.env import (
     DATABRICKS_SERVER_HOSTNAME,
     DBX_FORCE_LOCAL,
 )
+from dbxio.utils.logging import get_logger
 
 AZ_DBX_SCOPE = '2ff814a6-3304-4ab8-85cb-cd0e6f879c1d/.default'
 DBX_DEFAULT_HOST = 'databricks_default_host'
@@ -23,6 +23,8 @@ DBX_DEFAULT_SQL_HTTP_PATH = 'databricks_default_sql_http_path'
 DBX_DEFAULT_WAREHOUSE_SQL_HTTP_PATH = 'databricks_default_warehouse_sql_http_path'
 
 AZ_CRED_PROVIDER_TYPE = Union[TokenCredential, DefaultAzureCredential, AzureCliCredential]
+
+logger = get_logger()
 
 
 @attrs.define(slots=True)
@@ -71,10 +73,10 @@ def _get_token_airflow(retries: int = 5) -> Union[str, None]:
             if dbx_token := c.get_password():
                 return dbx_token
         except ModuleNotFoundError:
-            logging.warning('Databricks provider is not installed, not retryable error')
+            logger.warning('Databricks provider is not installed, not retryable error')
             break
         except AirflowNotFoundException as e:
-            logging.warning(f'Could not find databricks default connection: {e}')
+            logger.warning(f'Could not find databricks default connection: {e}')
             time.sleep(5 * 2**retry_i)
 
     return None
@@ -89,7 +91,7 @@ def _get_token_az(az_cred_provider: AZ_CRED_PROVIDER_TYPE = None, retries: int =
         try:
             return az_cred_provider.get_token(AZ_DBX_SCOPE).token
         except ClientAuthenticationError as e:
-            logging.warning(f'Could not get Databricks token due to connection error to Azure Vault: {e}')
+            logger.warning(f'Could not get Databricks token due to connection error to Azure Vault: {e}')
             time.sleep(5 * 2**retry_i)
     return None
 
@@ -172,7 +174,7 @@ def get_local_variables(
     """
     access_token = os.getenv(DATABRICKS_ACCESS_TOKEN)
     if not access_token:
-        logging.debug('No DATABRICKS_ACCESS_TOKEN found, trying to get token from Azure')
+        logger.debug('No DATABRICKS_ACCESS_TOKEN found, trying to get token from Azure')
         access_token = get_token(az_cred_provider)
     http_path = (
         semi_configured_credentials.http_path

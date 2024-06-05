@@ -1,8 +1,5 @@
 [![PyPI - Version](https://img.shields.io/pypi/v/dbxio)](https://pypi.org/project/dbxio/)
 [![GitHub Build](https://github.com/Toloka/dbxio/workflows/Tests/badge.svg)](https://github.com/Toloka/dbxio/actions)
-<a href="https://pypi.org/project/dbxio" target="_blank">
-    <img src="https://img.shields.io/pypi/pyversions/dbxio.svg?color=%2334D058" alt="Supported Python versions">
-</a>
 
 [![License](https://img.shields.io/:license-Apache%202-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0.txt)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/dbxio.svg)](https://pypi.org/project/dbxio/)

@@ -4,6 +4,11 @@ version = "0"  # poetry-version-plugin will replace this with the actual version
 description = "High-level Databricks client"
 authors = ["Nikita Yurasov <nikitayurasov@toloka.ai>"]
 readme = "README.md"
+license = "Apache-2.0"
+homepage = "https://github.com/Toloka/dbxio"
+repository = "https://github.com/Toloka/dbxio"
+documentation = "https://github.com/Toloka/dbxio/blob/main/docs/README.md"
+keywords = ["python", "databricks", "dbx"]
 packages = [{ include = "dbxio" }]
 
 [tool.poetry-version-plugin]

@@ -16,6 +16,16 @@ _dbxio_ is a high-level client for Databricks that simplifies working with table
 It provides a simple interface for reading and writing data, creating and deleting objects, and running SQL queries and
 fetching results.
 
+## Why _dbxio_?
+
+1. _dbxio_ connects the power of Databricks SQL and Python for local data manipulation.
+2. _dbxio_ provides a simple and intuitive interface for working with Databricks Tables and Volumes.
+   Now it's possible to read/write data with just a few lines of code.
+3. For data-intensive workflows, _dbxio_ uses object storage for data transfer, which is faster and more reliable than
+   running SQL queries.
+
+---
+
 ## Installation
 
 _dbxio_ requires Python 3.9 or later. You can install _dbxio_ using pip:
@@ -59,6 +69,8 @@ dbxio.bulk_write_table(
     append=True,
 )
 ```
+
+---
 
 ## Cloud Support
 

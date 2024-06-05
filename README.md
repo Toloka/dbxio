@@ -21,8 +21,10 @@ fetching results.
 1. _dbxio_ connects the power of Databricks SQL and Python for local data manipulation.
 2. _dbxio_ provides a simple and intuitive interface for working with Databricks Tables and Volumes.
    Now it's possible to read/write data with just a few lines of code.
-3. For data-intensive workflows, _dbxio_ uses object storage for data transfer, which is faster and more reliable than
-   running SQL queries.
+3. For large amounts of data, _dbxio_ uses intermediate object storage of your choice to perform bulk upload later (see
+   [COPY INTO](https://docs.databricks.com/en/sql/language-manual/delta-copy-into.html) for more details).
+   So, you can upload any amount of data, and _dbxio_ will take care of synchronizing the data with the table in
+   Databricks.
 
 ---
 

@@ -12,13 +12,31 @@
 
 ## Overview
 
-_dbxio_ is a high-level client for Databricks that simplifies working with tables and volumes.
+**_dbxio_** is a high-level client for Databricks that simplifies working with tables and volumes.
 It provides a simple interface for reading and writing data, creating and deleting objects, and running SQL queries and
 fetching results.
 
+## Why _dbxio_?
+
+1. **_dbxio_** connects the power of Databricks SQL and Python for local data manipulation.
+2. **_dbxio_** provides a simple and intuitive interface for working with Databricks Tables and Volumes.
+   Now it's possible to read/write data with just a few lines of code.
+3. For large amounts of data, **_dbxio_** uses intermediate object storage of your choice to perform bulk upload later
+   (see [COPY INTO](https://docs.databricks.com/en/sql/language-manual/delta-copy-into.html) for more details).
+   So, you can upload any amount of data, and _dbxio_ will take care of synchronizing the data with the table in
+   Databricks.
+
+### Alternatives
+
+Currently, we are not aware of any alternatives that offer the same functionality as **_dbxio_**.
+If you come across any, we would be interested to learn about them.
+Please let us know by opening an issue in our GitHub repository.
+
+---
+
 ## Installation
 
-_dbxio_ requires Python 3.9 or later. You can install _dbxio_ using pip:
+**_dbxio_** requires Python 3.9 or later. You can install **_dbxio_** using pip:
 
 ```bash
 pip install dbxio
@@ -60,9 +78,11 @@ dbxio.bulk_write_table(
 )
 ```
 
+---
+
 ## Cloud Support
 
-_dbxio_ supports the following cloud providers:
+**_dbxio_** supports the following cloud providers:
 
 - [x] Azure
 - [x] Nebius over Azure

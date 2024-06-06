@@ -49,8 +49,8 @@ import dbxio
 
 client = dbxio.DbxIOClient.from_cluster_settings(
     cluster_type=dbxio.ClusterType.SQL_WAREHOUSE,
-    http_path='sql/protocolv1/o/2350007385231210/abcdefg-12345',
-    server_hostname='adb-1234567890.00.azuredatabricks.net',
+    http_path='<YOUR_HTTP_PATH>',
+    server_hostname='<YOUR_SERVER_HOSTNAME>',
 )
 
 # read table

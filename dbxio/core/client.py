@@ -20,8 +20,8 @@ class DbxIOClient:
 
     To create a client, you can use one of the following methods:
     >>> client = DbxIOClient.from_cluster_settings(
-    ...     http_path='sql/protocolv1/o/2350007385231210/abcdefg-12345',
-    ...     server_hostname='adb-2350007385231210.10.azuredatabricks.net',
+    ...     http_path='<YOUR_HTTP_PATH>',
+    ...     server_hostname='<YOUR_SERVER_HOSTNAME>',
     ...     cluster_type=ClusterType.ALL_PURPOSE,
     ... )
     or
@@ -29,8 +29,8 @@ class DbxIOClient:
     ...     auth_provider=DefaultCredentialProvider(
     ...         cluster_type=ClusterType.ALL_PURPOSE,
     ...         az_cred_provider=AzureCliCredential(),
-    ...         http_path='sql/protocolv1/o/2350007385231210/abcdefg-12345',
-    ...         server_hostname='adb-2350007385231210.10.azuredatabricks.net',
+    ...         http_path='<YOUR_HTTP_PATH>',
+    ...         server_hostname='<YOUR_SERVER_HOSTNAME>',
     ...     ),
     ... )
     """

@@ -47,8 +47,8 @@ from dbxio import DbxIOClient, ClusterType
 
 client = DbxIOClient.from_cluster_settings(
     cluster_type=ClusterType.SQL_WAREHOUSE,
-    http_path='sql/protocolv1/o/2350007385231210/abcdefg-12345',
-    server_hostname='adb-2350007385231210.10.azuredatabricks.net',
+    http_path='<YOUR_HTTP_PATH>',
+    server_hostname='<YOUR_SERVER_HOSTNAME>',
 )
 ```
 
@@ -59,8 +59,8 @@ client = DbxIOClient.from_cluster_settings(
 import os
 from dbxio import DefaultSqlDbxIOClient, DefaultDbxIOClient
 
-os.environ['DATABRICKS_HTTP_PATH'] = 'sql/protocolv1/o/2350007385231210/abcdefg-12345'
-os.environ['DATABRICKS_SERVER_HOSTNAME'] = 'adb-2350007385231210.10.azuredatabricks.net'
+os.environ['DATABRICKS_HTTP_PATH'] = '<YOUR_HTTP_PATH>'
+os.environ['DATABRICKS_SERVER_HOSTNAME'] = '<YOUR_SERVER_HOSTNAME>'
 
 sql_client = DefaultSqlDbxIOClient()
 
@@ -75,8 +75,8 @@ from dbxio import DbxIOClient, BareAuthProvider, ClusterType
 client = DbxIOClient.from_auth_provider(
     auth_provider=BareAuthProvider(
         access_token='dapixxxxxx-xxxxx-xxxxxx-x',
-        server_hostname='adb-2350007385231210.10.azuredatabricks.net',
-        http_path='sql/protocolv1/o/2350007385231210/abcdefg-12345',
+        http_path='<YOUR_HTTP_PATH>',
+        server_hostname='<YOUR_SERVER_HOSTNAME>',
         cluster_type=ClusterType.SQL_WAREHOUSE,
     )
 )
@@ -159,8 +159,8 @@ import dbxio
 
 client = dbxio.DbxIOClient.from_cluster_settings(
     cluster_type=dbxio.ClusterType.SQL_WAREHOUSE,
-    http_path='sql/protocolv1/o/1234567890/abcdefg-12345',
-    server_hostname='adb-9643567843456789.10.azuredatabricks.net',
+    http_path='<YOUR_HTTP_PATH>',
+    server_hostname='<YOUR_SERVER_HOSTNAME>',
 )
 
 # fetch all results
@@ -180,8 +180,8 @@ import dbxio
 
 client = dbxio.DbxIOClient.from_cluster_settings(
     cluster_type=dbxio.ClusterType.SQL_WAREHOUSE,
-    http_path='sql/protocolv1/o/1234567890/abcdefg-12345',
-    server_hostname='adb-9643567843456789.10.azuredatabricks.net',
+    http_path='<YOUR_HTTP_PATH>',
+    server_hostname='<YOUR_SERVER_HOSTNAME>',
 )
 path_to_chunks = client.sql_to_files(
     query='select 1+1',
@@ -213,8 +213,8 @@ import dbxio
 
 client = dbxio.DbxIOClient.from_cluster_settings(
     cluster_type=dbxio.ClusterType.SQL_WAREHOUSE,
-    http_path='sql/protocolv1/o/123456789/abcdefg-12345',
-    server_hostname='adb-9876543456.10.azuredatabricks.net',
+    http_path='<YOUR_HTTP_PATH>',
+    server_hostname='<YOUR_SERVER_HOSTNAME>',
 )
 
 path_to_files = dbxio.save_table_to_files(
@@ -253,8 +253,8 @@ LARGE_FILE_TO_UPLOAD = 'path/to/large/file.csv'  # 1GB+
 
 client = dbxio.DbxIOClient.from_cluster_settings(
     cluster_type=dbxio.ClusterType.SQL_WAREHOUSE,
-    http_path='sql/protocolv1/o/98734567/abcdefg-12345',
-    server_hostname='adb-876434567.10.azuredatabricks.net',
+    http_path='<YOUR_HTTP_PATH>',
+    server_hostname='<YOUR_SERVER_HOSTNAME>',
 )
 schema = dbxio.infer_schema(pd.read_csv(LARGE_FILE_TO_UPLOAD, low_memory=True).iloc[0].to_dict())
 table_format = dbxio.TableFormat.CSV
@@ -313,8 +313,8 @@ import dbxio
 logging.basicConfig(level=logging.INFO)
 client = dbxio.DbxIOClient.from_cluster_settings(
     cluster_type=dbxio.ClusterType.SQL_WAREHOUSE,
-    http_path='sql/protocolv1/o/3456788654/abcdefg-12345',
-    server_hostname='adb-8765432345678.10.azuredatabricks.net',
+    http_path='<YOUR_HTTP_PATH>',
+    server_hostname='<YOUR_SERVER_HOSTNAME>',
 )
 
 # dbxio will upload all found files in the directory (except "hidden" files)

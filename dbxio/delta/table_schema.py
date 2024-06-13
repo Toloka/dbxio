@@ -1,3 +1,4 @@
+import copy
 from functools import cache
 from typing import Any
 
@@ -27,6 +28,15 @@ class TableSchema:
         except IndexError:
             raise AttributeError(f'Column {item} not found in schema. Possible columns: {self.columns}')
         return column
+
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        result = cls.__new__(cls)
+
+        for k, v in self.__dict__.items():
+            setattr(result, k, copy.deepcopy(v, memo))
+
+        return result
 
     @classmethod
     def from_obj(cls, obj):

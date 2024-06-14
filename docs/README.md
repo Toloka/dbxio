@@ -168,6 +168,9 @@ client = dbxio.DbxIOClient.from_cluster_settings(
 # fetch all results
 data = list(client.sql('select 1+1'))
 
+# fetch results and convert to pandas DataFrame
+df: pd.DataFrame = client.sql('select 1+1').df()
+
 # or you can use a generator
 with client.sql('select 1+1') as gen:
     for record in gen:

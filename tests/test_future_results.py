@@ -1,6 +1,7 @@
 from concurrent.futures import Future
 from tempfile import TemporaryDirectory
 
+import pandas as pd
 import pyarrow.parquet as pq
 from databricks.sdk.service.sql import ExecuteStatementResponse, ResultManifest, StatementState, StatementStatus
 from deepdiff import DeepDiff
@@ -77,3 +78,11 @@ def test_future_query_result_big_result(future_big_result):
 
         files = list(full_results_path.glob('*.parquet'))
         assert len(files) == res.cursor.total_records // ODBC_BATCH_SIZE_TO_FETCH
+
+
+def test_future_df(future_big_result):
+    res = _FutureODBCResult(future_big_result)
+    df_obs = res.df()
+    df_exp = pd.DataFrame([MOCK_ROW.asDict()] * res.cursor.total_records)
+
+    assert df_obs.equals(df_exp)

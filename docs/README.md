@@ -3,14 +3,14 @@
 - [Prerequisites](#prerequisites)
 - [Create `dbxio` client](#create-dbxio-client)
 - [Basic read/write table operations](#basic-readwrite-table-operations)
-  - [Read table](#read-table)
-  - [Write table](#write-table)
-  - [Run SQL query and fetch results](#run-sql-query-and-fetch-results)
-  - [Save results to files](#save-results-to-files)
-  - [Save SQL results to files](#save-sql-results-to-files)
-  - [Upload large files to Databricks table](#upload-large-files-to-databricks-table)
+    - [Read table](#read-table)
+    - [Write table](#write-table)
+    - [Run SQL query and fetch results](#run-sql-query-and-fetch-results)
+    - [Save results to files](#save-results-to-files)
+    - [Save SQL results to files](#save-sql-results-to-files)
+    - [Upload large files to Databricks table](#upload-large-files-to-databricks-table)
 - [Volume operations](#volume-operations)
-  - [Upload to Volume non-tabular data](#upload-to-volume-non-tabular-data)
+    - [Upload to Volume non-tabular data](#upload-to-volume-non-tabular-data)
 - [Further docs](#further-docs)
 
 ## Prerequisites
@@ -303,20 +303,11 @@ To work with Volumes in Databricks, you need to make sure that your target catal
 `dbxio` will upload all found files to the external storage and then create external volume with a link to the storage.
 
 Associated external storage is:
+
 - created external location in the Databricks workspace
 - stored desired container name in catalog's properties with key `default_external_location`
 
 ```python
-import logging
-import dbxio
-
-logging.basicConfig(level=logging.INFO)
-client = dbxio.DbxIOClient.from_cluster_settings(
-    cluster_type=dbxio.ClusterType.SQL_WAREHOUSE,
-    http_path='<YOUR_HTTP_PATH>',
-    server_hostname='<YOUR_SERVER_HOSTNAME>',
-)
-
 # dbxio will upload all found files in the directory (except "hidden" files)
 PATH_TO_FILES = 'path/to/files'
 dbxio.write_volume(
@@ -324,12 +315,34 @@ dbxio.write_volume(
     catalog_name='catalog_name',
     schema_name='schema_name',
     volume_name='volume_name',
-    client=client,
+    client=...,
     max_concurrency=8,
 )
 ```
 
+### Download from Volume
+
+A volume can be managed or external.
+`dbxio` fully supports both types.
+Downloading data from an external location will be done using SDK your cloud provider.
+To download data from managed volume `dbxio`
+use [Databricks Files API](https://docs.databricks.com/api/workspace/files).
+
+> [!NOTE]
+> Databricks API allows downloading files up to 5GB.
+> If you need to download bigger files, consider using external Volume or splitting the file into smaller parts.
+
+```python
+dbxio.download_volume(
+    path='local/path/to/download',
+    catalog_name='catalog_name',
+    schema_name='schema_name',
+    volume_name='volume_name',
+    client=...,
+)
+```
+
 ## Further docs
- 
-- [Use _dbxio_ with Nebius over Azure](./nebius.md) 
+
+- [Use _dbxio_ with Nebius over Azure](./nebius.md)
 - [Use _dbxio_ on Airflow](./airflow.md)

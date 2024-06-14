@@ -2,17 +2,17 @@ import hashlib
 from pathlib import Path
 from typing import TYPE_CHECKING, Union
 
-from azure.core.exceptions import ResourceExistsError
-from azure.storage.blob import BlobLeaseClient, BlobType
+from azure.storage.blob import BlobType
 
 from dbxio.utils.logging import get_logger
+from dbxio.utils.object_storage.exceptions import BlobModificationError
+
+if TYPE_CHECKING:
+    from dbxio.utils.object_storage.object_storage import ObjectStorage
 
 _HASHSUM_SUFFIX = '_HASHSUM'
 _SUCCESS_SUFFIX = '_SUCCESS'
 _LOCK_SUFFIX = '_LOCK'
-
-if TYPE_CHECKING:
-    from azure.storage.blob import BlobServiceClient, ContainerClient
 
 logger = get_logger()
 
@@ -30,34 +30,29 @@ def _get_file_hash(file_path: Path) -> str:
     return sha256.hexdigest()
 
 
-def _blob_exists(container_client: 'ContainerClient', blob_name: str, target_hashsum: str) -> bool:
+def _blob_exists(object_storage: 'ObjectStorage', blob_name: str, target_hashsum: str) -> bool:
     """
     Checks that blob exists in the container. It's also required to check that hashsums are equal and file with
     suffix _SUCCESS exists.
     """
-    blobs = [blob.name for blob in container_client.list_blobs(name_starts_with=blob_name)]
+    blobs = [blob.name for blob in object_storage.list_blobs(prefix=blob_name)]
     if f'{blob_name}{_SUCCESS_SUFFIX}' not in blobs or f'{blob_name}{_HASHSUM_SUFFIX}' not in blobs:
         logger.debug(f'Blob {blob_name} does not exist (no SUCCESS or HASHSUM file)')
         return False
-    saved_hashsum = container_client.download_blob(f'{blob_name}{_HASHSUM_SUFFIX}').readall().decode()
+    saved_hashsum = object_storage.download_blob(f'{blob_name}{_HASHSUM_SUFFIX}').decode()
     return saved_hashsum == target_hashsum
 
 
-def _lock_blob(blob_name: str, blob_service_client: 'BlobServiceClient', container_name: str, force: bool = False):
+def _lock_blob(blob_name: str, object_storage: 'ObjectStorage', force: bool = False):
     """
     Locks blob by creating a lease on <blob_name>_LOCK file.
     If any other process tries to upload the same file, it will fail to acquire the lease.
     If force is True, it will break the lease and acquire it again.
     """
-    blob_client = blob_service_client.get_blob_client(container=container_name, blob=f'{blob_name}{_LOCK_SUFFIX}')
     try:
-        blob_client.upload_blob(b'', overwrite=True)
-    except ResourceExistsError as e:
-        if force:
-            BlobLeaseClient(client=blob_client).break_lease()  # type: ignore
-        else:
-            raise e
-    blob_client.acquire_lease()
+        object_storage.upload_blob(f'{blob_name}{_LOCK_SUFFIX}', b'', overwrite=True)
+    except BlobModificationError:
+        object_storage.lock_blob(f'{blob_name}{_LOCK_SUFFIX}', force=force)
 
     logger.debug(f'Lock is acquired for {blob_name}')
 
@@ -65,8 +60,7 @@ def _lock_blob(blob_name: str, blob_service_client: 'BlobServiceClient', contain
 def upload_file(
     path: Union[str, Path],
     local_path: Union[str, Path],
-    blob_service_client: 'BlobServiceClient',
-    container_name: str,
+    object_storage: 'ObjectStorage',
     blobs: list[str],
     metablobs: list[str],
     operation_uuid: str,
@@ -80,7 +74,6 @@ def upload_file(
     """
     path = Path(path)
     local_path = Path(local_path)
-    container_client = blob_service_client.get_container_client(container_name)
     logger.debug(f'Using {max_concurrency} threads for uploading {path}')
 
     file_hash = _get_file_hash(path)
@@ -91,26 +84,25 @@ def upload_file(
 
     blobs.append(blob_name)
 
-    if _blob_exists(container_client, blob_name, file_hash):
+    if _blob_exists(object_storage, blob_name, file_hash):
         return blob_name
 
-    blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
-
-    _lock_blob(blob_name, blob_service_client, container_name, force=force)
+    _lock_blob(blob_name, object_storage, force=force)
 
     with open(path, 'rb') as data:
-        blob_client.upload_blob(
+        object_storage.upload_blob(
+            blob_name,
             data,
             blob_type=BlobType.BLOCKBLOB,
             overwrite=True,
             max_concurrency=int(max_concurrency),
         )
 
-    container_client.upload_blob(f'{blob_name}{_SUCCESS_SUFFIX}', b'', overwrite=True)
+    object_storage.upload_blob(f'{blob_name}{_SUCCESS_SUFFIX}', b'', overwrite=True)
     logger.debug(f'SUCCESS file is uploaded for {blob_name}')
-    container_client.upload_blob(f'{blob_name}{_HASHSUM_SUFFIX}', file_hash.encode(), overwrite=True)
+    object_storage.upload_blob(f'{blob_name}{_HASHSUM_SUFFIX}', file_hash.encode(), overwrite=True)
     logger.debug(f'HASHSUM file is uploaded for {blob_name}')
 
-    logger.info(f'Successfully uploaded {path} to {container_name}/{blob_name}')
+    logger.info(f'Successfully uploaded {path} to {object_storage.to_url()}')
 
     return blob_name

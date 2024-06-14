@@ -266,10 +266,11 @@ class TestTableCommands(unittest.TestCase):
         observed_query = mock_sql.call_args[0][0]
         assert flatten_query(observed_query) == flatten_query(expected_query)
 
-    @patch('dbxio.utils.blobs.BlobServiceClient', side_effect=MockBlobServiceClient)
+    @patch('dbxio.utils.object_storage._azure.BlobServiceClient', side_effect=MockBlobServiceClient)
+    @patch('dbxio.utils.object_storage._azure.BlobLeaseClient', side_effect=MockBlobLeaseClient)
     @patch.object(DbxIOClient, 'sql', side_effect=sql_mock)
     @patch.object(uuid, 'uuid4', side_effect=lambda: 'test_uuid')
-    def test_bulk_write_table(self, mock_uuid, mock_sql, mock_blob_service_client):
+    def test_bulk_write_table(self, mock_uuid, mock_sql, mock_blob_lease_client, mock_blob_service_client):
         bulk_write_table(
             table=self.table,
             new_records=[{'a': 1, 'b': 2}, {'a': 3, 'b': 4}],
@@ -289,8 +290,8 @@ class TestTableCommands(unittest.TestCase):
         observed_query = mock_sql.call_args[0][0]
         assert flatten_query(observed_query) == flatten_query(expected_query)
 
-    @patch('dbxio.utils.blobs.BlobServiceClient', side_effect=MockBlobServiceClient)
-    @patch('dbxio.utils.blobs.BlobLeaseClient', side_effect=MockBlobLeaseClient)
+    @patch('dbxio.utils.object_storage._azure.BlobServiceClient', side_effect=MockBlobServiceClient)
+    @patch('dbxio.utils.object_storage._azure.BlobLeaseClient', side_effect=MockBlobLeaseClient)
     @patch.object(DbxIOClient, 'sql', side_effect=sql_mock)
     @patch.object(uuid, 'uuid4', side_effect=lambda: 'test_uuid')
     @patch.dict('os.environ', {'USER': ''})
@@ -325,8 +326,8 @@ class TestTableCommands(unittest.TestCase):
         observed_query = mock_sql.call_args[0][0]
         assert flatten_query(observed_query) == flatten_query(expected_query)
 
-    @patch('dbxio.utils.blobs.BlobServiceClient', side_effect=MockBlobServiceClient)
-    @patch('dbxio.utils.blobs.BlobLeaseClient', side_effect=MockBlobLeaseClient)
+    @patch('dbxio.utils.object_storage._azure.BlobServiceClient', side_effect=MockBlobServiceClient)
+    @patch('dbxio.utils.object_storage._azure.BlobLeaseClient', side_effect=MockBlobLeaseClient)
     @patch.object(DbxIOClient, 'sql', side_effect=sql_mock)
     @patch.object(uuid, 'uuid4', side_effect=lambda: 'test_uuid')
     @patch.dict('os.environ', {'USER': ''})

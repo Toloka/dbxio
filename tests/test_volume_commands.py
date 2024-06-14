@@ -109,3 +109,6 @@ class TestVolumeCommands(TestCase):
         """)
         observed_query = mock_sql.call_args[0][0]
         assert flatten_query(observed_query) == flatten_query(expected_query)
+
+    def test_download_volume(self):
+        pass

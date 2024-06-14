@@ -1,5 +1,5 @@
-from dbxio.utils.blobs import blobs_gc, blobs_registries, get_blob_servie_client
-from dbxio.utils.databricks import ClusterType, get_storage_name_from_external_location
+from dbxio.utils.blobs import blobs_gc, blobs_registries
+from dbxio.utils.databricks import ClusterType
 from dbxio.utils.env import (
     AIRFLOW_UNIQUE_NAME,
     DATABRICKS_ACCESS_TOKEN,
@@ -9,16 +9,16 @@ from dbxio.utils.env import (
 )
 from dbxio.utils.http import get_session
 from dbxio.utils.logging import get_logger
+from dbxio.utils.object_storage import ObjectStorage
 
 __all__ = [
     'ClusterType',
-    'get_storage_name_from_external_location',
+    'ObjectStorage',
     'DATABRICKS_HTTP_PATH',
     'DATABRICKS_ACCESS_TOKEN',
     'DATABRICKS_SERVER_HOSTNAME',
     'DBX_FORCE_LOCAL',
     'AIRFLOW_UNIQUE_NAME',
-    'get_blob_servie_client',
     'blobs_registries',
     'blobs_gc',
     'get_session',

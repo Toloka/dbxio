@@ -1,6 +1,7 @@
 import re
+from io import IOBase
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterator, Optional
+from typing import TYPE_CHECKING, BinaryIO, Iterator, Optional
 
 import attrs
 from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
@@ -22,14 +23,8 @@ logger = get_logger()
 class _AzureBlobStorageImpl(ObjectStorage):
     container_name: str = attrs.field(validator=attrs.validators.instance_of(str))
     storage_name: str = attrs.field(validator=attrs.validators.instance_of(str))
-    blobs_path: Optional[str] = attrs.field(
-        default='',
-        validator=attrs.validators.optional(attrs.validators.instance_of(str)),
-    )
-    domain_name: Optional[str] = attrs.field(
-        default='dfs.core.windows.net',
-        validator=attrs.validators.optional(attrs.validators.instance_of(str)),
-    )
+    blobs_path: str = attrs.field(default='', validator=attrs.validators.instance_of(str))
+    domain_name: str = attrs.field(default='dfs.core.windows.net', validator=attrs.validators.instance_of(str))
     credential_provider: 'AZ_CRED_PROVIDER_TYPE' = attrs.field(default=DefaultAzureCredential())
     blob_service_client: BlobServiceClient = attrs.field()
 
@@ -76,7 +71,7 @@ class _AzureBlobStorageImpl(ObjectStorage):
 
     def break_lease(self, blob_name: str) -> None:
         blob_client = self.blob_service_client.get_blob_client(container=self.container_name, blob=blob_name)
-        BlobLeaseClient(client=blob_client).break_lease()
+        BlobLeaseClient(client=blob_client).break_lease()  # type: ignore
 
     def lock_blob(self, blob_name: str, force: bool = False):
         blob_client = self.blob_service_client.get_blob_client(container=self.container_name, blob=blob_name)
@@ -87,7 +82,7 @@ class _AzureBlobStorageImpl(ObjectStorage):
         except ResourceExistsError as e:
             raise BlobModificationError(f'Failed to lock blob {blob_name}') from e
 
-    def upload_blob(self, blob_name: str, data: bytes, overwrite: bool = False, **kwargs):
+    def upload_blob(self, blob_name: str, data: bytes | IOBase | BinaryIO, overwrite: bool = False, **kwargs):
         blob_client = self.blob_service_client.get_blob_client(container=self.container_name, blob=blob_name)
         try:
             blob_client.upload_blob(data, **kwargs, overwrite=overwrite)

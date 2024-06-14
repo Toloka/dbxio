@@ -103,11 +103,18 @@ def _download_external_volume(local_path: Path, storage_location: str):
 @retry(stop=stop_after_attempt(3), wait=wait_fixed(10))
 def _download_single_file_from_managed_volume(local_path: Path, file_path: str, client: 'DbxIOClient'):
     with open(local_path / Path(file_path).name, 'wb') as f:
-        f.write(client.workspace_api.files.download(file_path).contents.read())
+        response_content = client.workspace_api.files.download(file_path).contents
+        if response_content:
+            f.write(response_content.read())
+        else:
+            raise ValueError(f'Failed to download file {file_path}, got None')
 
 
 def _download_managed_volume(local_path: Path, volume: Volume, client: 'DbxIOClient'):
     for file in client.workspace_api.files.list_directory_contents(volume.mount_path):
+        if file.name is None or file.path is None:
+            raise ValueError(f'File {file} has no name or path')
+
         if file.is_directory:
             (local_path / file.name).mkdir(parents=True, exist_ok=True)
             _download_managed_volume(local_path / file.name, volume / file.name, client)
@@ -135,11 +142,15 @@ def download_volume(
     path = Path(path)
     assert path.is_dir(), 'Path must be a directory'
     volume_info = client.workspace_api.volumes.read(f'{catalog_name}.{schema_name}.{volume_name}')
+    if volume_info.volume_type is None:
+        raise ValueError(f'Volume {catalog_name}.{schema_name}.{volume_name} does not exist')
+
     volume = Volume(catalog=catalog_name, schema=schema_name, name=volume_name, volume_type=volume_info.volume_type)
     logger.info(f'Downloading volume: {volume.full_name}')
     logger.debug(f'Volume type: {volume.volume_type}')
 
     if volume_info.volume_type == VolumeType.EXTERNAL:
+        assert volume_info.storage_location, f'External volume must have a storage location, got {volume_info=}'
         _download_external_volume(local_path=path, storage_location=volume_info.storage_location)
     elif volume_info.volume_type == VolumeType.MANAGED:
         _download_managed_volume(local_path=path, volume=volume, client=client)

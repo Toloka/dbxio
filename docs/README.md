@@ -11,6 +11,7 @@
     - [Upload large files to Databricks table](#upload-large-files-to-databricks-table)
 - [Volume operations](#volume-operations)
     - [Upload to Volume non-tabular data](#upload-to-volume-non-tabular-data)
+    - [Download from Volume](#download-from-volume)
 - [Further docs](#further-docs)
 
 ## Prerequisites
@@ -91,10 +92,11 @@ client = DbxIOClient.from_auth_provider(
 ### Read table
 
 ```python
+import pandas as pd
 from dbxio import read_table
 
-# read all records from table
-table = list(read_table('catalog.schema.table', client=...))
+# read all records from table and convert to pandas DataFrame
+table = pd.DataFrame(read_table('catalog.schema.table', client=...))
 
 # read only 10 records
 table10 = list(read_table('catalog.schema.table', client=..., limit_records=10))
@@ -125,7 +127,7 @@ data = [
     {'col1': 1, 'col2': 'a', 'col3': [1, 2, 3]},
     {'col1': 2, 'col2': 'b', 'col3': [4, 5, 6]},
 ]
-schema = dbxio.TableSchema(
+schema = dbxio.TableSchema.from_obj(
     [
         {'name': 'col1', 'type': dbxio.types.IntType()},
         {'name': 'col2', 'type': dbxio.types.StringType()},

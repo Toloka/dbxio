@@ -61,12 +61,12 @@ data = [
     {'col1': 1, 'col2': 'a', 'col3': [1, 2, 3]},
     {'col1': 2, 'col2': 'b', 'col3': [4, 5, 6]},
 ]
-schema = dbxio.TableSchema(
-    [
-        {'name': 'col1', 'type': dbxio.types.IntType()},
-        {'name': 'col2', 'type': dbxio.types.StringType()},
-        {'name': 'col3', 'type': dbxio.types.ArrayType(dbxio.types.IntType())},
-    ]
+schema = dbxio.TableSchema.from_obj(
+    {
+        'col1': dbxio.types.IntType(),
+        'col2': dbxio.types.StringType(),
+        'col3': dbxio.types.ArrayType(dbxio.types.IntType()),
+    }
 )
 dbxio.bulk_write_table(
     dbxio.Table('domain.schema.table', schema=schema),

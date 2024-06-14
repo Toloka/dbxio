@@ -48,7 +48,7 @@ class ObjectStorageClient(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def download_blob_to_file(self, blob_name: str, file_path: str | Path) -> None:
+    def download_blob_to_file(self, blob_name: str, file_path: Union[str, Path]) -> None:
         raise NotImplementedError
 
     @abstractmethod

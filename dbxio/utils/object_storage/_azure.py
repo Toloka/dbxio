@@ -65,7 +65,7 @@ class _AzureBlobStorageClientImpl(ObjectStorageClient):
         blob_client = self.blob_service_client.get_blob_client(container=self.container_name, blob=blob_name)
         return blob_client.download_blob().readall()
 
-    def download_blob_to_file(self, blob_name: str, file_path: str | Path) -> None:
+    def download_blob_to_file(self, blob_name: str, file_path: Union[str, Path]) -> None:
         with open(file_path, 'wb') as f:
             f.write(self.download_blob(blob_name))
 

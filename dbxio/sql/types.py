@@ -315,7 +315,7 @@ class DateType(BaseType):
     """
 
     def fit(self, obj) -> bool:
-        if isinstance(obj, datetime.date):
+        if isinstance(obj, datetime.date) and not isinstance(obj, datetime.datetime):
             return True
         elif isinstance(obj, str):
             try:

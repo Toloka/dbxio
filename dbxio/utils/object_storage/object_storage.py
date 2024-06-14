@@ -2,10 +2,10 @@ import re
 from abc import ABC, abstractmethod
 from io import IOBase
 from pathlib import Path
-from typing import BinaryIO, Iterator, Optional, Type
+from typing import BinaryIO, Iterator, Optional, Type, Union
 
 
-class ObjectStorage(ABC):
+class ObjectStorageClient(ABC):
     url_regex: re.Pattern
 
     # azure properties
@@ -52,7 +52,7 @@ class ObjectStorage(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def upload_blob(self, blob_name: str, data: bytes | IOBase | BinaryIO, overwrite: bool = False, **kwargs):
+    def upload_blob(self, blob_name: str, data: Union[bytes, IOBase, BinaryIO], overwrite: bool = False, **kwargs):
         raise NotImplementedError
 
     @abstractmethod
@@ -64,22 +64,22 @@ class ObjectStorage(ABC):
         raise NotImplementedError
 
     @staticmethod
-    def _get_storage_impl(scheme: str) -> 'Type[ObjectStorage]':
-        from dbxio.utils.object_storage._aws import _S3StorageImpl
-        from dbxio.utils.object_storage._azure import _AzureBlobStorageImpl
-        from dbxio.utils.object_storage._gcp import _GCStorageImpl
+    def _get_storage_impl(scheme: str) -> 'Type[ObjectStorageClient]':
+        from dbxio.utils.object_storage._aws import _S3StorageClientImpl
+        from dbxio.utils.object_storage._azure import _AzureBlobStorageClientImpl
+        from dbxio.utils.object_storage._gcp import _GCStorageClientImpl
 
-        if scheme == _AzureBlobStorageImpl.scheme:
-            return _AzureBlobStorageImpl
-        if scheme == _S3StorageImpl.scheme:
-            return _S3StorageImpl
-        if scheme == _GCStorageImpl.scheme:
-            return _GCStorageImpl
+        if scheme == _AzureBlobStorageClientImpl.scheme:
+            return _AzureBlobStorageClientImpl
+        if scheme == _S3StorageClientImpl.scheme:
+            return _S3StorageClientImpl
+        if scheme == _GCStorageClientImpl.scheme:
+            return _GCStorageClientImpl
 
         raise ValueError(f'Unsupported scheme: {scheme}')
 
     @classmethod
-    def from_url(cls, storage_url: str) -> 'ObjectStorage':
+    def from_url(cls, storage_url: str) -> 'ObjectStorageClient':
         scheme, url = storage_url.split('://')
         _storage_impl = cls._get_storage_impl(scheme)
         _match = _storage_impl.url_regex.match(url)
@@ -89,6 +89,6 @@ class ObjectStorage(ABC):
         raise ValueError(f'Invalid Azure Blob Storage URL: {url}')
 
     @classmethod
-    def from_storage_options(cls, scheme: str, **storage_options) -> 'ObjectStorage':
+    def from_storage_options(cls, scheme: str, **storage_options) -> 'ObjectStorageClient':
         _storage_impl = cls._get_storage_impl(scheme)
         return _storage_impl(**storage_options)

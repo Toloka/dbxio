@@ -3,11 +3,11 @@ from typing import Optional
 
 import attrs
 
-from dbxio.utils.object_storage.object_storage import ObjectStorage
+from dbxio.utils.object_storage.object_storage import ObjectStorageClient
 
 
 @attrs.define
-class _GCStorageImpl(ObjectStorage):
+class _GCStorageClientImpl(ObjectStorageClient):
     bucket_name: str = attrs.field(validator=attrs.validators.instance_of(str))
     object_key: str = attrs.field(validator=attrs.validators.instance_of(str))
     domain_name: Optional[str] = None

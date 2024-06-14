@@ -2,17 +2,17 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from dbxio.utils.object_storage import ObjectStorage
+    from dbxio.utils.object_storage import ObjectStorageClient
 
 
-def blobs_gc(blobs: list[str], object_storage_client: 'ObjectStorage'):
+def blobs_gc(blobs: list[str], object_storage_client: 'ObjectStorageClient'):
     for blob in blobs:
         object_storage_client.try_delete_blob(blob)
 
 
 @contextmanager
 def blobs_registries(
-    object_storage_client: 'ObjectStorage',
+    object_storage_client: 'ObjectStorageClient',
     keep_blobs: bool = False,
     keep_metablobs: bool = False,
 ):

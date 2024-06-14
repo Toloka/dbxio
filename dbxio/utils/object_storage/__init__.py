@@ -1,5 +1,5 @@
-from dbxio.utils.object_storage.object_storage import ObjectStorage
+from dbxio.utils.object_storage.object_storage import ObjectStorageClient
 
 __all__ = [
-    'ObjectStorage',
+    'ObjectStorageClient',
 ]

@@ -8,7 +8,7 @@ from dbxio.utils.logging import get_logger
 from dbxio.utils.object_storage.exceptions import BlobModificationError
 
 if TYPE_CHECKING:
-    from dbxio.utils.object_storage.object_storage import ObjectStorage
+    from dbxio.utils.object_storage import ObjectStorageClient
 
 _HASHSUM_SUFFIX = '_HASHSUM'
 _SUCCESS_SUFFIX = '_SUCCESS'
@@ -30,29 +30,29 @@ def _get_file_hash(file_path: Path) -> str:
     return sha256.hexdigest()
 
 
-def _blob_exists(object_storage: 'ObjectStorage', blob_name: str, target_hashsum: str) -> bool:
+def _blob_exists(object_storage_client: 'ObjectStorageClient', blob_name: str, target_hashsum: str) -> bool:
     """
     Checks that blob exists in the container. It's also required to check that hashsums are equal and file with
     suffix _SUCCESS exists.
     """
-    blobs = [blob.name for blob in object_storage.list_blobs(prefix=blob_name)]
+    blobs = [blob.name for blob in object_storage_client.list_blobs(prefix=blob_name)]
     if f'{blob_name}{_SUCCESS_SUFFIX}' not in blobs or f'{blob_name}{_HASHSUM_SUFFIX}' not in blobs:
         logger.debug(f'Blob {blob_name} does not exist (no SUCCESS or HASHSUM file)')
         return False
-    saved_hashsum = object_storage.download_blob(f'{blob_name}{_HASHSUM_SUFFIX}').decode()
+    saved_hashsum = object_storage_client.download_blob(f'{blob_name}{_HASHSUM_SUFFIX}').decode()
     return saved_hashsum == target_hashsum
 
 
-def _lock_blob(blob_name: str, object_storage: 'ObjectStorage', force: bool = False):
+def _lock_blob(blob_name: str, object_storage_client: 'ObjectStorageClient', force: bool = False):
     """
     Locks blob by creating a lease on <blob_name>_LOCK file.
     If any other process tries to upload the same file, it will fail to acquire the lease.
     If force is True, it will break the lease and acquire it again.
     """
     try:
-        object_storage.upload_blob(f'{blob_name}{_LOCK_SUFFIX}', b'', overwrite=True)
+        object_storage_client.upload_blob(f'{blob_name}{_LOCK_SUFFIX}', b'', overwrite=True)
     except BlobModificationError:
-        object_storage.lock_blob(f'{blob_name}{_LOCK_SUFFIX}', force=force)
+        object_storage_client.lock_blob(f'{blob_name}{_LOCK_SUFFIX}', force=force)
 
     logger.debug(f'Lock is acquired for {blob_name}')
 
@@ -60,7 +60,7 @@ def _lock_blob(blob_name: str, object_storage: 'ObjectStorage', force: bool = Fa
 def upload_file(
     path: Union[str, Path],
     local_path: Union[str, Path],
-    object_storage: 'ObjectStorage',
+    object_storage_client: 'ObjectStorageClient',
     blobs: list[str],
     metablobs: list[str],
     operation_uuid: str,
@@ -84,13 +84,13 @@ def upload_file(
 
     blobs.append(blob_name)
 
-    if _blob_exists(object_storage, blob_name, file_hash):
+    if _blob_exists(object_storage_client, blob_name, file_hash):
         return blob_name
 
-    _lock_blob(blob_name, object_storage, force=force)
+    _lock_blob(blob_name, object_storage_client, force=force)
 
     with open(path, 'rb') as data:
-        object_storage.upload_blob(
+        object_storage_client.upload_blob(
             blob_name,
             data,
             blob_type=BlobType.BLOCKBLOB,
@@ -98,11 +98,11 @@ def upload_file(
             max_concurrency=int(max_concurrency),
         )
 
-    object_storage.upload_blob(f'{blob_name}{_SUCCESS_SUFFIX}', b'', overwrite=True)
+    object_storage_client.upload_blob(f'{blob_name}{_SUCCESS_SUFFIX}', b'', overwrite=True)
     logger.debug(f'SUCCESS file is uploaded for {blob_name}')
-    object_storage.upload_blob(f'{blob_name}{_HASHSUM_SUFFIX}', file_hash.encode(), overwrite=True)
+    object_storage_client.upload_blob(f'{blob_name}{_HASHSUM_SUFFIX}', file_hash.encode(), overwrite=True)
     logger.debug(f'HASHSUM file is uploaded for {blob_name}')
 
-    logger.info(f'Successfully uploaded {path} to {object_storage.to_url()}')
+    logger.info(f'Successfully uploaded {path} to {object_storage_client.to_url()}')
 
     return blob_name

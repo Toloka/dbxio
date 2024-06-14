@@ -13,7 +13,7 @@ from dbxio.blobs.download import download_blob_tree
 from dbxio.sql.results import _FutureBaseResult
 from dbxio.utils.blobs import blobs_registries
 from dbxio.utils.logging import get_logger
-from dbxio.utils.object_storage import ObjectStorage
+from dbxio.utils.object_storage import ObjectStorageClient
 
 if TYPE_CHECKING:
     from dbxio.core.client import DbxIOClient
@@ -96,8 +96,12 @@ def _exists_volume(volume: Volume, client: 'DbxIOClient') -> bool:
 
 
 def _download_external_volume(local_path: Path, storage_location: str):
-    object_storage = ObjectStorage.from_url(storage_location)
-    download_blob_tree(object_storage=object_storage, local_path=local_path, prefix_path=object_storage.blobs_path)
+    object_storage = ObjectStorageClient.from_url(storage_location)
+    download_blob_tree(
+        object_storage_client=object_storage,
+        local_path=local_path,
+        prefix_path=object_storage.blobs_path,
+    )
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_fixed(10))
@@ -195,10 +199,10 @@ def write_volume(
         )
     storage_url = client.workspace_api.external_locations.get(default_external_location).url
     assert storage_url, f'External location {default_external_location} does not have a URL'
-    object_storage = ObjectStorage.from_url(storage_url)
+    object_storage_client = ObjectStorageClient.from_url(storage_url)
 
     operation_uuid = str(uuid.uuid4())
-    with blobs_registries(object_storage, keep_blobs=True) as (blobs, metablobs):
+    with blobs_registries(object_storage_client, keep_blobs=True) as (blobs, metablobs):
         # here all files in the path, including subdirectories, are uploaded to the blob storage.
         # only "hidden" files (those starting with a dot) are skipped
         for file in path.glob('**/*'):
@@ -206,15 +210,15 @@ def write_volume(
                 upload_file(
                     path=file,
                     local_path=path,
-                    object_storage=object_storage,
+                    object_storage_client=object_storage_client,
                     operation_uuid=operation_uuid,
                     blobs=blobs,
                     metablobs=metablobs,
                     max_concurrency=max_concurrency,
                     force=force,
                 )
-        object_storage.blobs_path = str(os.path.commonpath(blobs))
-        storage_location = object_storage.to_url()
+        object_storage_client.blobs_path = str(os.path.commonpath(blobs))
+        storage_location = object_storage_client.to_url()
     volume = Volume(
         catalog=catalog_name,
         schema=schema_name,

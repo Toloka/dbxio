@@ -1,7 +1,7 @@
 import re
 from io import IOBase
 from pathlib import Path
-from typing import TYPE_CHECKING, BinaryIO, Iterator, Optional
+from typing import TYPE_CHECKING, BinaryIO, Iterator, Optional, Union
 
 import attrs
 from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
@@ -11,7 +11,7 @@ from cachetools import TTLCache
 
 from dbxio.utils.logging import get_logger
 from dbxio.utils.object_storage.exceptions import BlobModificationError
-from dbxio.utils.object_storage.object_storage import ObjectStorage
+from dbxio.utils.object_storage.object_storage import ObjectStorageClient
 
 if TYPE_CHECKING:
     from dbxio.core.auth import AZ_CRED_PROVIDER_TYPE
@@ -20,7 +20,7 @@ logger = get_logger()
 
 
 @attrs.define
-class _AzureBlobStorageImpl(ObjectStorage):
+class _AzureBlobStorageClientImpl(ObjectStorageClient):
     container_name: str = attrs.field(validator=attrs.validators.instance_of(str))
     storage_name: str = attrs.field(validator=attrs.validators.instance_of(str))
     blobs_path: str = attrs.field(default='', validator=attrs.validators.instance_of(str))
@@ -82,7 +82,7 @@ class _AzureBlobStorageImpl(ObjectStorage):
         except ResourceExistsError as e:
             raise BlobModificationError(f'Failed to lock blob {blob_name}') from e
 
-    def upload_blob(self, blob_name: str, data: bytes | IOBase | BinaryIO, overwrite: bool = False, **kwargs):
+    def upload_blob(self, blob_name: str, data: Union[bytes, IOBase, BinaryIO], overwrite: bool = False, **kwargs):
         blob_client = self.blob_service_client.get_blob_client(container=self.container_name, blob=blob_name)
         try:
             blob_client.upload_blob(data, **kwargs, overwrite=overwrite)

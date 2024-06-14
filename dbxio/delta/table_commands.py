@@ -15,7 +15,7 @@ from dbxio.sql.query import ConstDatabricksQuery
 from dbxio.sql.results import _FutureBaseResult
 from dbxio.utils.blobs import blobs_registries
 from dbxio.utils.logging import get_logger
-from dbxio.utils.object_storage import ObjectStorage
+from dbxio.utils.object_storage import ObjectStorageClient
 
 if TYPE_CHECKING:
     from dbxio.core import DbxIOClient
@@ -226,7 +226,7 @@ def bulk_write_table(
     pa_table = create_pa_table(columnar_table, schema=dbxio_table.schema)
     pa_table_as_bytes = pa_table2parquet(pa_table)
 
-    object_storage = ObjectStorage.from_storage_options(
+    object_storage = ObjectStorageClient.from_storage_options(
         scheme='abfss',  # TODO: make cloud-agnostic
         storage_name=abs_name,
         container_name=abs_container_name,
@@ -268,7 +268,7 @@ def bulk_write_local_files(
     files = p.glob(f'*.{table_format.value.lower()}') if p.is_dir() else [path]
 
     operation_uuid = str(uuid.uuid4())
-    object_storage = ObjectStorage.from_storage_options(
+    object_storage = ObjectStorageClient.from_storage_options(
         scheme='abfss',  # TODO: make cloud-agnostic
         storage_name=abs_name,
         container_name=abs_container_name,
@@ -279,7 +279,7 @@ def bulk_write_local_files(
             upload_file(
                 filename,  # type: ignore
                 p,
-                object_storage=object_storage,
+                object_storage_client=object_storage,
                 operation_uuid=operation_uuid,
                 blobs=blobs,
                 metablobs=metablobs,

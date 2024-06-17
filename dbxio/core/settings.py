@@ -5,7 +5,9 @@ import attrs
 from dbxio.core.cloud import CloudProvider
 
 _DEFAULT_CLOUD_PROVIDER = CloudProvider.AZURE  # TODO: get provider from env or remove this default at all
-_SUPPORTED_CLOUD_PROVIDERS = [CloudProvider.AZURE, CloudProvider.NEBIUS_OVER_AZURE]
+_SUPPORTED_CLOUD_PROVIDERS = [
+    CloudProvider.AZURE,
+]
 
 CLOUD_PROVIDER_ENV_VAR = 'CLOUD_PROVIDER'
 

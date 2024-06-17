@@ -1,5 +1,6 @@
 import pytest
 
+from dbxio.core.cloud import CloudProvider
 from dbxio.core.cloud.aws.object_storage import _S3StorageClientImpl
 from dbxio.core.cloud.azure.object_storage import _AzureBlobStorageClientImpl
 from dbxio.core.cloud.client.object_storage import ObjectStorageClient
@@ -23,7 +24,7 @@ def test_object_storage_azure_from_storage_options():
         storage_name='storageaccount',
         domain_name='dfs.core.windows.net',
         blobs_path='depts/hr/employees',
-        cloud_provider='azure',
+        cloud_provider=CloudProvider.AZURE,
     )
     assert isinstance(sl, _AzureBlobStorageClientImpl)
     assert sl.container_name == 'container'
@@ -56,7 +57,7 @@ def test_object_storage_s3_from_storage_options():
     sl = ObjectStorageClient.from_storage_options(
         bucket_name='bucket-name',
         object_key='path/to/data',
-        cloud_provider='aws',
+        cloud_provider=CloudProvider.AWS,
     )
     assert isinstance(sl, _S3StorageClientImpl)
     assert sl.bucket_name == 'bucket-name'
@@ -86,7 +87,7 @@ def test_object_storage_gs_from_storage_options():
     sl = ObjectStorageClient.from_storage_options(
         bucket_name='bucket-name',
         object_key='path/to/data',
-        cloud_provider='gcp',
+        cloud_provider=CloudProvider.GCP,
     )
     assert isinstance(sl, _GCStorageClientImpl)
     assert sl.bucket_name == 'bucket-name'

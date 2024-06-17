@@ -3,11 +3,10 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
 import attrs
-from azure.identity import AzureCliCredential
 from databricks.sdk import StatementExecutionAPI, WorkspaceClient
 
 from dbxio.core.credentials import AZ_CRED_PROVIDER_TYPE, BaseAuthProvider, DefaultCredentialProvider
-from dbxio.core.settings import CloudProvider, Settings
+from dbxio.core.settings import Settings
 from dbxio.sql.query import BaseDatabricksQuery
 from dbxio.sql.results import _FutureBaseResult
 from dbxio.sql.sql_driver import SQLDriver, get_sql_driver
@@ -151,22 +150,4 @@ class DefaultSqlDbxIOClient(DbxIOClient):
             credential_provider=DefaultCredentialProvider(cluster_type=ClusterType.SQL_WAREHOUSE),
             session_configuration=session_configuration,
             settings=Settings(),
-        )
-
-
-class DefaultNebiusSqlClient(DbxIOClient):
-    """
-    Default client for SQL warehouses with Azure CLI as the credential provider.
-
-    On Nebius VMs, Azure CLI is the default credential provider.
-    """
-
-    def __init__(self, session_configuration: Optional[Dict[str, Any]] = None):
-        super().__init__(
-            credential_provider=DefaultCredentialProvider(
-                cluster_type=ClusterType.SQL_WAREHOUSE,
-                az_cred_provider=AzureCliCredential(),
-            ),
-            session_configuration=session_configuration,
-            settings=Settings(cloud_provider=CloudProvider.NEBIUS_OVER_AZURE),
         )

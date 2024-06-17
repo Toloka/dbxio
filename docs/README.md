@@ -102,6 +102,21 @@ client = dbxio.DbxIOClient.from_cluster_settings(
 )
 ```
 
+### Explicitly specify credential provider
+
+Credential provider is resolved automatically based on the cloud provider. But you can specify it explicitly when
+creating a client.
+
+```python
+import dbxio
+from azure.identity import AzureCliCredential
+
+client = dbxio.DbxIOClient.from_cluster_settings(
+    # ...,
+    az_cred_provider=AzureCliCredential(),
+    # ...,
+)
+```
 
 ## Basic read/write table operations
 
@@ -369,5 +384,4 @@ dbxio.download_volume(
 
 ## Further docs
 
-- [Use _dbxio_ with Nebius over Azure](./nebius.md)
 - [Use _dbxio_ on Airflow](./airflow.md)

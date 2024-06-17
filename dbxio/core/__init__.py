@@ -1,5 +1,5 @@
 from dbxio.core.auth import ClusterCredentials, SemiConfiguredClusterCredentials, get_token
-from dbxio.core.client import DbxIOClient, DefaultDbxIOClient, DefaultNebiusSqlClient, DefaultSqlDbxIOClient
+from dbxio.core.client import DbxIOClient, DefaultDbxIOClient, DefaultSqlDbxIOClient
 from dbxio.core.credentials import (
     BareAuthProvider,
     BaseAuthProvider,
@@ -17,7 +17,6 @@ __all__ = [
     'DbxIOClient',
     'DefaultDbxIOClient',
     'DefaultSqlDbxIOClient',
-    'DefaultNebiusSqlClient',
     'BaseAuthProvider',
     'ClusterEnvAuthProvider',
     'ClusterAirflowAuthProvider',

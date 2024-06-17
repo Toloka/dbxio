@@ -80,15 +80,12 @@ class ObjectStorageClient(ABC):
         from dbxio.core.cloud.aws.object_storage import _S3StorageClientImpl
         from dbxio.core.cloud.azure.object_storage import _AzureBlobStorageClientImpl
         from dbxio.core.cloud.gcp.object_storage import _GCStorageClientImpl
-        from dbxio.core.cloud.nebius_over_azure.object_storage import _NebiusOverAzureBlobStorageClientImpl
 
         assert by_scheme or by_cloud_provider, 'Either by_scheme or by_cloud_provider should be set to True'
 
         attr_name = 'scheme' if by_scheme else 'cloud_provider_name'
         if value == getattr(_AzureBlobStorageClientImpl, attr_name):
             return _AzureBlobStorageClientImpl
-        if value == getattr(_NebiusOverAzureBlobStorageClientImpl, attr_name):
-            return _NebiusOverAzureBlobStorageClientImpl
         if value == getattr(_S3StorageClientImpl.scheme, attr_name):
             return _S3StorageClientImpl
         if value == getattr(_GCStorageClientImpl.scheme, attr_name):

@@ -86,7 +86,6 @@ dbxio.bulk_write_table(
 **_dbxio_** supports the following cloud providers:
 
 - [x] Azure
-- [x] Nebius over Azure
 - [ ] AWS (in plans)
 - [ ] GCP (in plans)
 

@@ -49,14 +49,6 @@ class _AzureBlobStorageClientImpl(ObjectStorageClient):
     def account_url(self) -> str:
         return f'https://{self.storage_name}.blob.core.windows.net'
 
-    # @property
-    # @cachedmethod(lambda self: self._cache, key=partial(hashkey, 'blob_service_client'))
-    # def blob_service_client(self) -> BlobServiceClient:
-    #     return BlobServiceClient(
-    #         account_url=f'https://{self.storage_name}.blob.core.windows.net',
-    #         credential=self.credential_provider,
-    #     )
-
     def list_blobs(self, prefix: Optional[str] = None, **kwargs) -> Iterator:
         container_client = self.blob_service_client.get_container_client(self.container_name)
         return container_client.list_blobs(name_starts_with=prefix, **kwargs)

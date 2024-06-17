@@ -3,7 +3,8 @@ from typing import Optional
 
 import attrs
 
-from dbxio.utils.object_storage.object_storage import ObjectStorageClient
+from dbxio.core.cloud.aws import AWS_ClOUD_PROVIDER_NAME
+from dbxio.core.cloud.client.object_storage import ObjectStorageClient
 
 
 @attrs.define
@@ -12,8 +13,8 @@ class _S3StorageClientImpl(ObjectStorageClient):
     object_key: str = attrs.field(validator=attrs.validators.instance_of(str))
     domain_name: Optional[str] = None
 
-    # scheme: str = attrs.field(default='s3', init=False)
     scheme = 's3'
+    cloud_provider_name = AWS_ClOUD_PROVIDER_NAME
     # bucket_name/object_key
     url_regex = re.compile(r'^(?P<bucket_name>[^/]+)/(?P<object_key>.*)$')
 

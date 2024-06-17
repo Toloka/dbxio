@@ -9,11 +9,9 @@ from dbxio.utils.env import (
 )
 from dbxio.utils.http import get_session
 from dbxio.utils.logging import get_logger
-from dbxio.utils.object_storage import ObjectStorageClient
 
 __all__ = [
     'ClusterType',
-    'ObjectStorageClient',
     'DATABRICKS_HTTP_PATH',
     'DATABRICKS_ACCESS_TOKEN',
     'DATABRICKS_SERVER_HOSTNAME',

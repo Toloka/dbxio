@@ -8,6 +8,7 @@ from dbxio.core.credentials import (
     DefaultCredentialProvider,
 )
 from dbxio.core.exceptions import DbxIOTypeError, InsufficientCredentialsError, ReadDataError, UnavailableAuthError
+from dbxio.core.settings import Settings
 
 __all__ = [
     'get_token',
@@ -26,4 +27,5 @@ __all__ = [
     'InsufficientCredentialsError',
     'UnavailableAuthError',
     'ReadDataError',
+    'Settings',
 ]

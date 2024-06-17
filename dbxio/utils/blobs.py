@@ -2,7 +2,7 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from dbxio.utils.object_storage import ObjectStorageClient
+    from dbxio.core.cloud.client.object_storage import ObjectStorageClient
 
 
 def blobs_gc(blobs: list[str], object_storage_client: 'ObjectStorageClient'):

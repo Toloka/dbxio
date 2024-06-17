@@ -79,7 +79,7 @@ class TestVolumeCommands(TestCase):
         assert flatten_query(observed_query) == flatten_query(expected_query)
 
     def test_set_tags_on_volume_empty_dict(self):
-        with pytest.raises(AssertionError):
+        with pytest.raises(ValueError):
             set_tags_on_volume(self.volume, {}, self.client)
 
     @patch.object(DbxIOClient, 'sql', side_effect=sql_mock)
@@ -93,7 +93,7 @@ class TestVolumeCommands(TestCase):
         assert flatten_query(observed_query) == flatten_query(expected_query)
 
     def test_unset_tags_on_volume_empty_list(self):
-        with pytest.raises(AssertionError):
+        with pytest.raises(ValueError):
             unset_tags_on_volume(self.volume, [], self.client)
 
     @patch.object(DbxIOClient, 'sql', side_effect=sql_mock)

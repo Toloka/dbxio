@@ -10,10 +10,10 @@ from tenacity import retry, stop_after_attempt, wait_fixed
 
 from dbxio.blobs.block_upload import upload_file
 from dbxio.blobs.download import download_blob_tree
+from dbxio.core.cloud.client.object_storage import ObjectStorageClient
 from dbxio.sql.results import _FutureBaseResult
 from dbxio.utils.blobs import blobs_registries
 from dbxio.utils.logging import get_logger
-from dbxio.utils.object_storage import ObjectStorageClient
 
 if TYPE_CHECKING:
     from dbxio.core.client import DbxIOClient
@@ -144,7 +144,8 @@ def download_volume(
     :param client: dbxio client
     """
     path = Path(path)
-    assert path.is_dir(), 'Path must be a directory'
+    if not path.exists() or not path.is_dir():
+        raise ValueError('Path must be an existing directory')
     volume_info = client.workspace_api.volumes.read(f'{catalog_name}.{schema_name}.{volume_name}')
     if volume_info.volume_type is None:
         raise ValueError(f'Volume {catalog_name}.{schema_name}.{volume_name} does not exist')
@@ -242,7 +243,8 @@ def set_tags_on_volume(volume: Volume, tags: dict[str, str], client: 'DbxIOClien
     Sets tags on a volume.
     Each tag is a key-value pair of strings.
     """
-    assert tags, 'tags must be a non-empty dictionary'
+    if not tags:
+        raise ValueError('tags must be a non-empty dictionary')
 
     set_tags_query = dedent(f"""
     ALTER VOLUME {volume.safe_full_name}
@@ -256,7 +258,8 @@ def unset_tags_on_volume(volume: Volume, tags: list[str], client: 'DbxIOClient')
     """
     Unsets tags on a volume.
     """
-    assert tags, 'tags must be a non-empty list'
+    if not tags:
+        raise ValueError('tags must be a non-empty list')
 
     unset_tags_query = dedent(f"""
     ALTER VOLUME {volume.safe_full_name}

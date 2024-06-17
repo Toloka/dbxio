@@ -28,6 +28,11 @@ class ObjectStorageClient(ABC):
 
     @property
     @abstractmethod
+    def cloud_provider_name(self) -> str:
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
     def credential_provider(self):
         raise NotImplementedError
 
@@ -64,24 +69,34 @@ class ObjectStorageClient(ABC):
         raise NotImplementedError
 
     @staticmethod
-    def _get_storage_impl(scheme: str) -> 'Type[ObjectStorageClient]':
-        from dbxio.utils.object_storage._aws import _S3StorageClientImpl
-        from dbxio.utils.object_storage._azure import _AzureBlobStorageClientImpl
-        from dbxio.utils.object_storage._gcp import _GCStorageClientImpl
+    def _get_storage_impl(
+        value: str,
+        by_scheme: bool = False,
+        by_cloud_provider: bool = False,
+    ) -> 'Type[ObjectStorageClient]':
+        from dbxio.core.cloud.aws.object_storage import _S3StorageClientImpl
+        from dbxio.core.cloud.azure.object_storage import _AzureBlobStorageClientImpl
+        from dbxio.core.cloud.gcp.object_storage import _GCStorageClientImpl
+        from dbxio.core.cloud.nebius_over_azure.object_storage import _NebiusOverAzureBlobStorageClientImpl
 
-        if scheme == _AzureBlobStorageClientImpl.scheme:
+        assert by_scheme or by_cloud_provider, 'Either by_scheme or by_cloud_provider should be set to True'
+
+        attr_name = 'scheme' if by_scheme else 'cloud_provider_name'
+        if value == getattr(_AzureBlobStorageClientImpl, attr_name):
             return _AzureBlobStorageClientImpl
-        if scheme == _S3StorageClientImpl.scheme:
+        if value == getattr(_NebiusOverAzureBlobStorageClientImpl, attr_name):
+            return _NebiusOverAzureBlobStorageClientImpl
+        if value == getattr(_S3StorageClientImpl.scheme, attr_name):
             return _S3StorageClientImpl
-        if scheme == _GCStorageClientImpl.scheme:
+        if value == getattr(_GCStorageClientImpl.scheme, attr_name):
             return _GCStorageClientImpl
 
-        raise ValueError(f'Unsupported scheme: {scheme}')
+        raise ValueError(f'Unsupported storage type: {value}')
 
     @classmethod
     def from_url(cls, storage_url: str) -> 'ObjectStorageClient':
         scheme, url = storage_url.split('://')
-        _storage_impl = cls._get_storage_impl(scheme)
+        _storage_impl = cls._get_storage_impl(scheme, by_scheme=True)
         _match = _storage_impl.url_regex.match(url)
         if _match:
             return _storage_impl(**_match.groupdict())
@@ -89,6 +104,6 @@ class ObjectStorageClient(ABC):
         raise ValueError(f'Invalid Azure Blob Storage URL: {url}')
 
     @classmethod
-    def from_storage_options(cls, scheme: str, **storage_options) -> 'ObjectStorageClient':
-        _storage_impl = cls._get_storage_impl(scheme)
+    def from_storage_options(cls, cloud_provider: str, **storage_options) -> 'ObjectStorageClient':
+        _storage_impl = cls._get_storage_impl(cloud_provider, by_cloud_provider=True)
         return _storage_impl(**storage_options)

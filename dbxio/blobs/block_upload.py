@@ -4,11 +4,11 @@ from typing import TYPE_CHECKING, Union
 
 from azure.storage.blob import BlobType
 
+from dbxio.core.cloud.exceptions import BlobModificationError
 from dbxio.utils.logging import get_logger
-from dbxio.utils.object_storage.exceptions import BlobModificationError
 
 if TYPE_CHECKING:
-    from dbxio.utils.object_storage import ObjectStorageClient
+    from dbxio.core.cloud.client.object_storage import ObjectStorageClient
 
 _HASHSUM_SUFFIX = '_HASHSUM'
 _SUCCESS_SUFFIX = '_SUCCESS'

@@ -9,9 +9,10 @@ from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobLeaseClient, BlobServiceClient
 from cachetools import TTLCache
 
+from dbxio.core.cloud.azure import AZURE_ClOUD_PROVIDER_NAME
+from dbxio.core.cloud.client.object_storage import ObjectStorageClient
+from dbxio.core.cloud.exceptions import BlobModificationError
 from dbxio.utils.logging import get_logger
-from dbxio.utils.object_storage.exceptions import BlobModificationError
-from dbxio.utils.object_storage.object_storage import ObjectStorageClient
 
 if TYPE_CHECKING:
     from dbxio.core.auth import AZ_CRED_PROVIDER_TYPE
@@ -29,6 +30,7 @@ class _AzureBlobStorageClientImpl(ObjectStorageClient):
     blob_service_client: BlobServiceClient = attrs.field()
 
     scheme = 'abfss'
+    cloud_provider_name = AZURE_ClOUD_PROVIDER_NAME
     # container_name@storage_name.domain_name/blobs_path
     url_regex = re.compile(
         r'(?P<container_name>[^@]+)@(?P<storage_name>[^.]+)\.(?P<domain_name>[^/]+)/(?P<blobs_path>.*)$'

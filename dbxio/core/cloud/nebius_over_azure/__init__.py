@@ -1,0 +1,1 @@
+NEBIUS_OVER_AZURE_ClOUD_PROVIDER_NAME = 'nebius_over_azure'

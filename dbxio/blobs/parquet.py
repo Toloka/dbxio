@@ -8,9 +8,9 @@ import pyarrow.parquet as pq
 from dbxio.sql.types import convert_dbxio_type_to_pa_type
 
 if TYPE_CHECKING:
+    from dbxio.core.cloud.client.object_storage import ObjectStorageClient
     from dbxio.delta.table import Table
     from dbxio.delta.table_schema import TableSchema
-    from dbxio.utils.object_storage import ObjectStorageClient
 
 ROW_GROUP_SIZE_BYTES = 128 * 2**20
 

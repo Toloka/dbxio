@@ -7,6 +7,7 @@ from azure.identity import AzureCliCredential
 from databricks.sdk import StatementExecutionAPI, WorkspaceClient
 
 from dbxio.core.credentials import AZ_CRED_PROVIDER_TYPE, BaseAuthProvider, DefaultCredentialProvider
+from dbxio.core.settings import Settings
 from dbxio.sql.query import BaseDatabricksQuery
 from dbxio.sql.results import _FutureBaseResult
 from dbxio.sql.sql_driver import SQLDriver, get_sql_driver
@@ -38,6 +39,7 @@ class DbxIOClient:
     credential_provider: Union[BaseAuthProvider, DefaultCredentialProvider] = attrs.field(
         validator=attrs.validators.instance_of((BaseAuthProvider, DefaultCredentialProvider))
     )
+    settings: Settings = attrs.field(validator=attrs.validators.instance_of(Settings))
 
     session_configuration: Optional[Dict[str, Any]] = None
 
@@ -48,6 +50,7 @@ class DbxIOClient:
         server_hostname: str,
         cluster_type: ClusterType,
         az_cred_provider: AZ_CRED_PROVIDER_TYPE = None,
+        settings: Optional[Settings] = None,
         **kwargs,
     ):
         """
@@ -59,15 +62,20 @@ class DbxIOClient:
             http_path=http_path,
             server_hostname=server_hostname,
         )
-        return cls.from_auth_provider(auth_provider=provider, **kwargs)
+        return cls.from_auth_provider(auth_provider=provider, settings=settings or Settings(), **kwargs)
 
     @classmethod
-    def from_auth_provider(cls, auth_provider: Union[BaseAuthProvider, DefaultCredentialProvider], **kwargs):
+    def from_auth_provider(
+        cls,
+        auth_provider: Union[BaseAuthProvider, DefaultCredentialProvider],
+        settings: Optional[Settings] = None,
+        **kwargs,
+    ):
         """
         Create a client from the auth provider.
         Use this method if you want to generate a short-lived token based on the available authentication method.
         """
-        return cls(credential_provider=auth_provider, **kwargs)
+        return cls(credential_provider=auth_provider, settings=settings or Settings(), **kwargs)
 
     @property
     def _cluster_credentials(self):
@@ -127,6 +135,7 @@ class DefaultDbxIOClient(DbxIOClient):
         super().__init__(
             credential_provider=DefaultCredentialProvider(cluster_type=ClusterType.ALL_PURPOSE),
             session_configuration=session_configuration,
+            settings=Settings(),
         )
 
 
@@ -141,6 +150,7 @@ class DefaultSqlDbxIOClient(DbxIOClient):
         super().__init__(
             credential_provider=DefaultCredentialProvider(cluster_type=ClusterType.SQL_WAREHOUSE),
             session_configuration=session_configuration,
+            settings=Settings(),
         )
 
 
@@ -158,4 +168,5 @@ class DefaultNebiusSqlClient(DbxIOClient):
                 az_cred_provider=AzureCliCredential(),
             ),
             session_configuration=session_configuration,
+            settings=Settings(cloud_provider='nebius_over_azure'),
         )

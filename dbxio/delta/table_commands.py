@@ -9,13 +9,13 @@ from databricks.sql import ServerOperationError
 
 from dbxio.blobs.block_upload import upload_file
 from dbxio.blobs.parquet import create_pa_table, create_tmp_parquet, pa_table2parquet
+from dbxio.core.cloud.client.object_storage import ObjectStorageClient
 from dbxio.delta.parsers import infer_schema
 from dbxio.delta.table import Table, TableFormat
 from dbxio.sql.query import ConstDatabricksQuery
 from dbxio.sql.results import _FutureBaseResult
 from dbxio.utils.blobs import blobs_registries
 from dbxio.utils.logging import get_logger
-from dbxio.utils.object_storage import ObjectStorageClient
 
 if TYPE_CHECKING:
     from dbxio.core import DbxIOClient
@@ -227,7 +227,7 @@ def bulk_write_table(
     pa_table_as_bytes = pa_table2parquet(pa_table)
 
     object_storage = ObjectStorageClient.from_storage_options(
-        scheme='abfss',  # TODO: make cloud-agnostic
+        cloud_provider=client.settings.cloud_provider,
         storage_name=abs_name,
         container_name=abs_container_name,
         credential_provider=client.credential_provider.az_cred_provider,
@@ -269,7 +269,7 @@ def bulk_write_local_files(
 
     operation_uuid = str(uuid.uuid4())
     object_storage = ObjectStorageClient.from_storage_options(
-        scheme='abfss',  # TODO: make cloud-agnostic
+        cloud_provider=client.settings.cloud_provider,
         storage_name=abs_name,
         container_name=abs_container_name,
         credential_provider=client.credential_provider.az_cred_provider,

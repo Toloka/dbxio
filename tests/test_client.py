@@ -2,7 +2,7 @@ import os
 from unittest.mock import patch
 
 from dbxio import ClusterType
-from dbxio.core.client import DbxIOClient, DefaultDbxIOClient, DefaultNebiusSqlClient, DefaultSqlDbxIOClient
+from dbxio.core.client import DbxIOClient, DefaultDbxIOClient, DefaultSqlDbxIOClient
 from dbxio.core.credentials import (
     BareAuthProvider,
     ClusterCredentials,
@@ -97,17 +97,20 @@ def test_default_sql_client(patch_default_az_cred, monkeypatch):
     )
 
 
-@patch('dbxio.core.client.AzureCliCredential', side_effect=MockDefaultAzureCredential)
-def test_default_nebius_sql_client(patch_default_az_cred, monkeypatch):
-    os.environ[DATABRICKS_HTTP_PATH] = 'sql/protocolv1/o/111111/1-1-a'
-    os.environ[DATABRICKS_SERVER_HOSTNAME] = 'adb-123456789.10.azuredatabricks.net'
+@patch('azure.identity.AzureCliCredential', side_effect=MockDefaultAzureCredential)
+def test_client_with_explicit_credential_provider(patch_default_az_cred, monkeypatch):
+    from azure.identity import AzureCliCredential
 
-    client = DefaultNebiusSqlClient()
+    client = DbxIOClient.from_cluster_settings(
+        http_path='test_sql_endpoint_path',
+        server_hostname='test_host_name',
+        cluster_type=ClusterType.SQL_WAREHOUSE,
+        az_cred_provider=AzureCliCredential(),
+    )
 
     assert isinstance(client.credential_provider, DefaultCredentialProvider)
-    assert client.credential_provider.semi_configured_credentials is None
     assert client.credential_provider.get_credentials() == ClusterCredentials(
         access_token='azure_access_token_for_scope_2ff814a6-3304-4ab8-85cb-cd0e6f879c1d/.default',
-        server_hostname=os.environ[DATABRICKS_SERVER_HOSTNAME],
-        http_path=os.environ[DATABRICKS_HTTP_PATH],
+        server_hostname='test_host_name',
+        http_path='test_sql_endpoint_path',
     )

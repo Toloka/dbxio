@@ -9,11 +9,12 @@ from databricks.sql import ServerOperationError
 
 from dbxio.blobs.block_upload import upload_file
 from dbxio.blobs.parquet import create_pa_table, create_tmp_parquet, pa_table2parquet
+from dbxio.core.cloud.client.object_storage import ObjectStorageClient
 from dbxio.delta.parsers import infer_schema
 from dbxio.delta.table import Table, TableFormat
 from dbxio.sql.query import ConstDatabricksQuery
 from dbxio.sql.results import _FutureBaseResult
-from dbxio.utils.blobs import blobs_registries, get_blob_servie_client
+from dbxio.utils.blobs import blobs_registries
 from dbxio.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -225,12 +226,14 @@ def bulk_write_table(
     pa_table = create_pa_table(columnar_table, schema=dbxio_table.schema)
     pa_table_as_bytes = pa_table2parquet(pa_table)
 
-    abs_client = get_blob_servie_client(
-        abs_name,
-        az_cred_provider=client.credential_provider.az_cred_provider,
-    ).get_container_client(abs_container_name)
+    object_storage = ObjectStorageClient.from_storage_options(
+        cloud_provider=client.settings.cloud_provider,
+        storage_name=abs_name,
+        container_name=abs_container_name,
+        credential_provider=client.credential_provider.az_cred_provider,
+    )
 
-    with create_tmp_parquet(pa_table_as_bytes, dbxio_table.table_identifier, abs_client) as tmp_path:
+    with create_tmp_parquet(pa_table_as_bytes, dbxio_table.table_identifier, object_storage) as tmp_path:
         if not append:
             drop_table(dbxio_table, client=client, force=True).wait()
         create_table(dbxio_table, client=client).wait()
@@ -261,18 +264,22 @@ def bulk_write_local_files(
     """
     assert table.schema, 'Table schema is required for bulk_write_local_files function'
 
-    abs_client = get_blob_servie_client(abs_name, az_cred_provider=client.credential_provider.az_cred_provider)
     p = Path(path)
     files = p.glob(f'*.{table_format.value.lower()}') if p.is_dir() else [path]
 
     operation_uuid = str(uuid.uuid4())
-    with blobs_registries(abs_client, abs_container_name) as (blobs, metablobs):
+    object_storage = ObjectStorageClient.from_storage_options(
+        cloud_provider=client.settings.cloud_provider,
+        storage_name=abs_name,
+        container_name=abs_container_name,
+        credential_provider=client.credential_provider.az_cred_provider,
+    )
+    with blobs_registries(object_storage_client=object_storage) as (blobs, metablobs):
         for filename in files:
             upload_file(
                 filename,  # type: ignore
                 p,
-                abs_client,
-                abs_container_name,
+                object_storage_client=object_storage,
                 operation_uuid=operation_uuid,
                 blobs=blobs,
                 metablobs=metablobs,

@@ -1,0 +1,1 @@
+AWS_ClOUD_PROVIDER_NAME = 'aws'

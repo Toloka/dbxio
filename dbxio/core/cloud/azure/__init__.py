@@ -1,0 +1,1 @@
+AZURE_ClOUD_PROVIDER_NAME = 'azure'

@@ -2,15 +2,17 @@
 
 - [Prerequisites](#prerequisites)
 - [Create `dbxio` client](#create-dbxio-client)
+- [Specify cloud provider](#specify-cloud-provider)
 - [Basic read/write table operations](#basic-readwrite-table-operations)
-  - [Read table](#read-table)
-  - [Write table](#write-table)
-  - [Run SQL query and fetch results](#run-sql-query-and-fetch-results)
-  - [Save results to files](#save-results-to-files)
-  - [Save SQL results to files](#save-sql-results-to-files)
-  - [Upload large files to Databricks table](#upload-large-files-to-databricks-table)
+    - [Read table](#read-table)
+    - [Write table](#write-table)
+    - [Run SQL query and fetch results](#run-sql-query-and-fetch-results)
+    - [Save results to files](#save-results-to-files)
+    - [Save SQL results to files](#save-sql-results-to-files)
+    - [Upload large files to Databricks table](#upload-large-files-to-databricks-table)
 - [Volume operations](#volume-operations)
-  - [Upload to Volume non-tabular data](#upload-to-volume-non-tabular-data)
+    - [Upload to Volume non-tabular data](#upload-to-volume-non-tabular-data)
+    - [Download from Volume](#download-from-volume)
 - [Further docs](#further-docs)
 
 ## Prerequisites
@@ -82,6 +84,40 @@ client = DbxIOClient.from_auth_provider(
 )
 ```
 
+## Specify cloud provider
+
+`dbxio` supports (or will support in the future, see [available cloud providers](../README.md#cloud-support)) cloud
+providers supported by Databricks.
+
+To specify the cloud provider, pass settings to the client:
+
+```python
+import dbxio
+
+client = dbxio.DbxIOClient.from_cluster_settings(
+    cluster_type=dbxio.ClusterType.SQL_WAREHOUSE,
+    http_path='<YOUR_HTTP_PATH>',
+    server_hostname='<YOUR_SERVER_HOSTNAME>',
+    settings=dbxio.Settings(cloud_provider=dbxio.CloudProvider.AZURE),
+)
+```
+
+### Explicitly specify credential provider
+
+Credential provider is resolved automatically based on the cloud provider. But you can specify it explicitly when
+creating a client.
+
+```python
+import dbxio
+from azure.identity import AzureCliCredential
+
+client = dbxio.DbxIOClient.from_cluster_settings(
+    # ...,
+    az_cred_provider=AzureCliCredential(),
+    # ...,
+)
+```
+
 ## Basic read/write table operations
 
 > [!NOTE]
@@ -91,10 +127,11 @@ client = DbxIOClient.from_auth_provider(
 ### Read table
 
 ```python
+import pandas as pd
 from dbxio import read_table
 
-# read all records from table
-table = list(read_table('catalog.schema.table', client=...))
+# read all records from table and convert to pandas DataFrame
+table = pd.DataFrame(read_table('catalog.schema.table', client=...))
 
 # read only 10 records
 table10 = list(read_table('catalog.schema.table', client=..., limit_records=10))
@@ -125,7 +162,7 @@ data = [
     {'col1': 1, 'col2': 'a', 'col3': [1, 2, 3]},
     {'col1': 2, 'col2': 'b', 'col3': [4, 5, 6]},
 ]
-schema = dbxio.TableSchema(
+schema = dbxio.TableSchema.from_obj(
     [
         {'name': 'col1', 'type': dbxio.types.IntType()},
         {'name': 'col2', 'type': dbxio.types.StringType()},
@@ -165,6 +202,9 @@ client = dbxio.DbxIOClient.from_cluster_settings(
 
 # fetch all results
 data = list(client.sql('select 1+1'))
+
+# fetch results and convert to pandas DataFrame
+df: pd.DataFrame = client.sql('select 1+1').df()
 
 # or you can use a generator
 with client.sql('select 1+1') as gen:
@@ -303,20 +343,11 @@ To work with Volumes in Databricks, you need to make sure that your target catal
 `dbxio` will upload all found files to the external storage and then create external volume with a link to the storage.
 
 Associated external storage is:
+
 - created external location in the Databricks workspace
 - stored desired container name in catalog's properties with key `default_external_location`
 
 ```python
-import logging
-import dbxio
-
-logging.basicConfig(level=logging.INFO)
-client = dbxio.DbxIOClient.from_cluster_settings(
-    cluster_type=dbxio.ClusterType.SQL_WAREHOUSE,
-    http_path='<YOUR_HTTP_PATH>',
-    server_hostname='<YOUR_SERVER_HOSTNAME>',
-)
-
 # dbxio will upload all found files in the directory (except "hidden" files)
 PATH_TO_FILES = 'path/to/files'
 dbxio.write_volume(
@@ -324,12 +355,33 @@ dbxio.write_volume(
     catalog_name='catalog_name',
     schema_name='schema_name',
     volume_name='volume_name',
-    client=client,
+    client=...,
     max_concurrency=8,
 )
 ```
 
+### Download from Volume
+
+A volume can be managed or external.
+`dbxio` fully supports both types.
+Downloading data from an external location will be done using SDK your cloud provider.
+To download data from managed volume `dbxio`
+use [Databricks Files API](https://docs.databricks.com/api/workspace/files).
+
+> [!NOTE]
+> Databricks API allows downloading files up to 5GB.
+> If you need to download bigger files, consider using external Volume or splitting the file into smaller parts.
+
+```python
+dbxio.download_volume(
+    path='local/path/to/download',
+    catalog_name='catalog_name',
+    schema_name='schema_name',
+    volume_name='volume_name',
+    client=...,
+)
+```
+
 ## Further docs
- 
-- [Use _dbxio_ with Nebius over Azure](./nebius.md) 
+
 - [Use _dbxio_ on Airflow](./airflow.md)

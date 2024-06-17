@@ -1,6 +1,7 @@
 from dbxio.volume.volume_commands import (
     Volume,
     create_volume,
+    download_volume,
     get_comment_on_volume,
     get_tags_on_volume,
     set_comment_on_volume,
@@ -13,6 +14,7 @@ from dbxio.volume.volume_commands import (
 __all__ = [
     'Volume',
     'create_volume',
+    'download_volume',
     'write_volume',
     'get_comment_on_volume',
     'set_comment_on_volume',

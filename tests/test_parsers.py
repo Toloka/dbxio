@@ -114,10 +114,7 @@ class TestTableSchema(unittest.TestCase):
 
         assert types.ArrayType(types.StringType()).serialize(['a', 'b', 'c']) == 'ARRAY("a", "b", "c")'
         assert types.ArrayType(types.IntType()).serialize([1, 2, 3]) == 'ARRAY(1, 2, 3)'
-        assert (
-            types.ArrayType(types.DateType()).serialize([datetime.datetime(2023, 1, 1, 0, 0, 0)])
-            == "ARRAY(DATE'2023-01-01T00:00:00')"
-        )
+        assert types.ArrayType(types.DateType()).serialize([datetime.date(2023, 1, 1)]) == "ARRAY(DATE'2023-01-01')"
         with self.assertRaises(Exception):
             types.ArrayType(types.IntType()).serialize([1, 2, 3, 'a'])
 

@@ -6,6 +6,7 @@ from functools import cached_property
 from pathlib import Path
 from typing import Optional, Union
 
+import pandas as pd
 import pyarrow as pa
 from databricks.sdk.service.sql import (
     ExecuteStatementResponse,
@@ -56,6 +57,9 @@ class _FutureBaseResult(metaclass=ABCMeta):
     @abstractmethod
     def download_and_save(self, results_path: str, max_concurrency: int = 1) -> Path:
         raise NotImplementedError()
+
+    def df(self) -> pd.DataFrame:
+        return pd.DataFrame(self)
 
 
 class _FutureODBCResult(_FutureBaseResult):

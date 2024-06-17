@@ -1,5 +1,5 @@
 from dbxio.core.auth import ClusterCredentials, SemiConfiguredClusterCredentials, get_token
-from dbxio.core.client import DbxIOClient, DefaultDbxIOClient, DefaultNebiusSqlClient, DefaultSqlDbxIOClient
+from dbxio.core.client import DbxIOClient, DefaultDbxIOClient, DefaultSqlDbxIOClient
 from dbxio.core.credentials import (
     BareAuthProvider,
     BaseAuthProvider,
@@ -8,6 +8,7 @@ from dbxio.core.credentials import (
     DefaultCredentialProvider,
 )
 from dbxio.core.exceptions import DbxIOTypeError, InsufficientCredentialsError, ReadDataError, UnavailableAuthError
+from dbxio.core.settings import CloudProvider, Settings
 
 __all__ = [
     'get_token',
@@ -16,7 +17,6 @@ __all__ = [
     'DbxIOClient',
     'DefaultDbxIOClient',
     'DefaultSqlDbxIOClient',
-    'DefaultNebiusSqlClient',
     'BaseAuthProvider',
     'ClusterEnvAuthProvider',
     'ClusterAirflowAuthProvider',
@@ -26,4 +26,6 @@ __all__ = [
     'InsufficientCredentialsError',
     'UnavailableAuthError',
     'ReadDataError',
+    'Settings',
+    'CloudProvider',
 ]

@@ -19,6 +19,16 @@ class ColumnSpec(pydantic.BaseModel):
 
 
 class TableSchema:
+    """
+    Represents a schema of a table.
+    Schema is a collection of columns and associated types.
+    To create a schema, use factory method `from_obj` with one of the following types:
+        - list[dict] - list of dictionaries with keys 'name' and 'type', like
+            >>> TableSchema.from_obj([{'name': 'id', 'type': IntType()}, {'name': 'name', 'type': StringType()}])
+        - dict - dictionary with column names as keys and types as values, like
+            >>> TableSchema.from_obj({'id': IntType(), 'name': StringType()})
+    """
+
     def __init__(self, raw_schema: list[dict[str, BaseType]]):
         self._columns: list[ColumnSpec] = self._check_schema_obj(raw_schema)
 
@@ -46,10 +56,10 @@ class TableSchema:
             return TableSchema(obj)
         if isinstance(obj, dict):
             return TableSchema([{'name': k, 'type': v} for k, v in obj.items()])
-        elif isinstance(obj, TableSchema):
+        if isinstance(obj, TableSchema):
             return obj
-        else:
-            raise TypeError(f'Got unexpected obj with type {type(obj)}')
+
+        raise TypeError(f'Got unexpected obj with type {type(obj)}')
 
     @staticmethod
     def _check_schema_obj(schema: list[dict]) -> list[ColumnSpec]:

@@ -51,6 +51,7 @@ client = dbxio.DbxIOClient.from_cluster_settings(
     cluster_type=dbxio.ClusterType.SQL_WAREHOUSE,
     http_path='<YOUR_HTTP_PATH>',
     server_hostname='<YOUR_SERVER_HOSTNAME>',
+    settings=dbxio.Settings(cloud_provider=dbxio.CloudProvider.AZURE),
 )
 
 # read table

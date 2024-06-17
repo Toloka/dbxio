@@ -2,7 +2,10 @@ import re
 from abc import ABC, abstractmethod
 from io import IOBase
 from pathlib import Path
-from typing import BinaryIO, Iterator, Optional, Type, Union
+from typing import TYPE_CHECKING, BinaryIO, Iterator, Optional, Type, Union
+
+if TYPE_CHECKING:
+    from dbxio.core.cloud import CloudProvider
 
 
 class ObjectStorageClient(ABC):
@@ -70,7 +73,7 @@ class ObjectStorageClient(ABC):
 
     @staticmethod
     def _get_storage_impl(
-        value: str,
+        value: 'Union[str | CloudProvider]',
         by_scheme: bool = False,
         by_cloud_provider: bool = False,
     ) -> 'Type[ObjectStorageClient]':
@@ -104,6 +107,6 @@ class ObjectStorageClient(ABC):
         raise ValueError(f'Invalid Azure Blob Storage URL: {url}')
 
     @classmethod
-    def from_storage_options(cls, cloud_provider: str, **storage_options) -> 'ObjectStorageClient':
+    def from_storage_options(cls, cloud_provider: 'CloudProvider', **storage_options) -> 'ObjectStorageClient':
         _storage_impl = cls._get_storage_impl(cloud_provider, by_cloud_provider=True)
         return _storage_impl(**storage_options)

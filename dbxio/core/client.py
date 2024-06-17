@@ -7,7 +7,7 @@ from azure.identity import AzureCliCredential
 from databricks.sdk import StatementExecutionAPI, WorkspaceClient
 
 from dbxio.core.credentials import AZ_CRED_PROVIDER_TYPE, BaseAuthProvider, DefaultCredentialProvider
-from dbxio.core.settings import Settings
+from dbxio.core.settings import CloudProvider, Settings
 from dbxio.sql.query import BaseDatabricksQuery
 from dbxio.sql.results import _FutureBaseResult
 from dbxio.sql.sql_driver import SQLDriver, get_sql_driver
@@ -168,5 +168,5 @@ class DefaultNebiusSqlClient(DbxIOClient):
                 az_cred_provider=AzureCliCredential(),
             ),
             session_configuration=session_configuration,
-            settings=Settings(cloud_provider='nebius_over_azure'),
+            settings=Settings(cloud_provider=CloudProvider.NEBIUS_OVER_AZURE),
         )

@@ -2,6 +2,7 @@
 
 - [Prerequisites](#prerequisites)
 - [Create `dbxio` client](#create-dbxio-client)
+- [Specify cloud provider](#specify-cloud-provider)
 - [Basic read/write table operations](#basic-readwrite-table-operations)
     - [Read table](#read-table)
     - [Write table](#write-table)
@@ -82,6 +83,25 @@ client = DbxIOClient.from_auth_provider(
     )
 )
 ```
+
+## Specify cloud provider
+
+`dbxio` supports (or will support in the future, see [available cloud providers](../README.md#cloud-support)) cloud
+providers supported by Databricks.
+
+To specify the cloud provider, pass settings to the client:
+
+```python
+import dbxio
+
+client = dbxio.DbxIOClient.from_cluster_settings(
+    cluster_type=dbxio.ClusterType.SQL_WAREHOUSE,
+    http_path='<YOUR_HTTP_PATH>',
+    server_hostname='<YOUR_SERVER_HOSTNAME>',
+    settings=dbxio.Settings(cloud_provider=dbxio.CloudProvider.AZURE),
+)
+```
+
 
 ## Basic read/write table operations
 

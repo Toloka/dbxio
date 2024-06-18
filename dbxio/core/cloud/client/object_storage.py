@@ -101,7 +101,7 @@ class ObjectStorageClient(ABC):
         if _match:
             return _storage_impl(**_match.groupdict())
 
-        raise ValueError(f'Invalid Azure Blob Storage URL: {url}')
+        raise ValueError(f'Invalid Storage URL: {url}')
 
     @classmethod
     def from_storage_options(cls, cloud_provider: 'CloudProvider', **storage_options) -> 'ObjectStorageClient':

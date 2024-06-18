@@ -132,7 +132,7 @@ def download_volume(
     schema_name: str,
     volume_name: str,
     client: 'DbxIOClient',
-) -> None:
+) -> Path:
     """
     Downloads files from a volume in Databricks to a local directory.
     Volume must be an external volume.
@@ -150,7 +150,13 @@ def download_volume(
     if volume_info.volume_type is None:
         raise ValueError(f'Volume {catalog_name}.{schema_name}.{volume_name} does not exist')
 
-    volume = Volume(catalog=catalog_name, schema=schema_name, name=volume_name, volume_type=volume_info.volume_type)
+    volume = Volume(
+        catalog=catalog_name,
+        schema=schema_name,
+        name=volume_name,
+        volume_type=volume_info.volume_type,
+        storage_location=volume_info.storage_location,
+    )
     logger.info(f'Downloading volume: {volume.full_name}')
     logger.debug(f'Volume type: {volume.volume_type}')
 
@@ -163,6 +169,8 @@ def download_volume(
         raise ValueError(f'Unknown volume type: {volume_info.volume_type}')
 
     logger.info(f'Volume {volume.full_name} was successfully downloaded to {path}')
+
+    return path
 
 
 def write_volume(

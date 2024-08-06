@@ -1,4 +1,3 @@
-from functools import cached_property
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
@@ -91,8 +90,7 @@ class DbxIOClient:
     def statement_api(self) -> StatementExecutionAPI:
         return self.workspace_api.statement_execution
 
-    @cached_property
-    def _sql_driver(self) -> SQLDriver:
+    def get_sql_driver(self) -> SQLDriver:
         return get_sql_driver(
             cluster_type=self.credential_provider.cluster_type,
             cluster_credentials=self._cluster_credentials,
@@ -107,7 +105,7 @@ class DbxIOClient:
 
         Results might be combined into chunks, so it's recommended to flatten them if you need a list of rows.
         """
-        return self._sql_driver.sql(query)
+        return self.get_sql_driver().sql(query)
 
     def sql_to_files(
         self,
@@ -120,7 +118,7 @@ class DbxIOClient:
         Returns the path to the directory with the results including the statement ID.
         """
 
-        return self._sql_driver.sql_to_files(query, results_path, max_concurrency)
+        return self.get_sql_driver().sql_to_files(query, results_path, max_concurrency)
 
 
 class DefaultDbxIOClient(DbxIOClient):

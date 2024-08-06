@@ -1,4 +1,3 @@
-from functools import cached_property
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
@@ -91,7 +90,7 @@ class DbxIOClient:
     def statement_api(self) -> StatementExecutionAPI:
         return self.workspace_api.statement_execution
 
-    @cached_property
+    @property
     def _sql_driver(self) -> SQLDriver:
         return get_sql_driver(
             cluster_type=self.credential_provider.cluster_type,

@@ -285,7 +285,7 @@ def write_volume(
     schema_name: str,
     volume_name: str,
     client: 'DbxIOClient',
-    volume_type: VolumeType = VolumeType.EXTERNAL,
+    volume_type: VolumeType,
     create_volume_if_not_exists: bool = True,
     max_concurrency: int = 1,
     force: bool = False,

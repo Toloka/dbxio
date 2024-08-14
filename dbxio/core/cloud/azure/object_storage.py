@@ -94,5 +94,5 @@ class _AzureBlobStorageClientImpl(ObjectStorageClient):
 
         try:
             blob_client.delete_blob()
-        except ResourceNotFoundError:
+        except (ResourceNotFoundError, ResourceExistsError):
             pass

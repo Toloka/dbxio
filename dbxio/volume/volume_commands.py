@@ -47,6 +47,26 @@ class Volume:
         if self.volume_type == VolumeType.EXTERNAL and not self.storage_location:
             raise ValueError('storage_location is required for external volumes')
 
+    @classmethod
+    def from_url(cls, url: str, client: 'DbxIOClient') -> 'Volume':
+        """
+        Creates a Volume object from a URL.
+        URL pattern must be:
+            /Volumes/<catalog>/<schema>/<volume_name>
+        """
+        if not url.startswith('/Volumes/'):
+            raise ValueError('URL must start with /Volumes/')
+
+        _, catalog, schema, name = url.lstrip('/').split('/')
+        raw_volume_info = client.workspace_api.volumes.read(f'{catalog}.{schema}.{name}')
+        return cls(
+            catalog=raw_volume_info.catalog_name,
+            schema=raw_volume_info.schema_name,
+            name=raw_volume_info.name,
+            volume_type=VolumeType(raw_volume_info.volume_type),
+            storage_location=raw_volume_info.storage_location,
+        )
+
     def __truediv__(self, path: str):
         return Volume(
             catalog=self.catalog,
@@ -76,7 +96,11 @@ class Volume:
         return self.volume_type is VolumeType.EXTERNAL
 
 
-def create_volume(volume: Volume, client: 'DbxIOClient') -> None:
+def create_volume(volume: Volume, client: 'DbxIOClient', skip_if_exists: bool = True) -> None:
+    if skip_if_exists and _exists_volume(volume, client):
+        logger.info(f'Volume {volume.safe_full_name} already exists, skipping creation.')
+        return
+
     client.workspace_api.volumes.create(
         catalog_name=volume.catalog,
         schema_name=volume.schema,
@@ -173,30 +197,16 @@ def download_volume(
     return path
 
 
-def write_volume(
-    path: Union[str, Path],
+def _write_external_volume(
+    path: Path,
     catalog_name: str,
     schema_name: str,
     volume_name: str,
     client: 'DbxIOClient',
-    create_volume_if_not_exists: bool = True,
-    max_concurrency: int = 1,
-    force: bool = False,
-) -> None:
-    """
-    writes the contents of a local directory to a volume in Databricks.
-
-    :param path: local directory or file to upload
-    :param catalog_name: databricks catalog name
-    :param schema_name: databricks schema name
-    :param volume_name: volume name
-    :param client: dbxio client
-    :param create_volume_if_not_exists: flag to create the volume if it does not exist
-    :param max_concurrency: the maximum number of threads to use for uploading files
-    :param force: a flag to break leases if the blob is already in use
-    """
-    path = Path(path)
-
+    max_concurrency: int,
+    create_volume_if_not_exists: bool,
+    force: bool,
+):
     catalog = client.workspace_api.catalogs.get(catalog_name)
     catalog_properties = catalog.properties if catalog.properties else {}
 
@@ -228,22 +238,90 @@ def write_volume(
                 )
         object_storage_client.blobs_path = str(os.path.commonpath(blobs))
         storage_location = object_storage_client.to_url()
+
+        volume = Volume(
+            catalog=catalog_name,
+            schema=schema_name,
+            name=volume_name,
+            volume_type=VolumeType.EXTERNAL,
+            storage_location=storage_location,
+        )
+        create_volume(
+            volume=volume,
+            client=client,
+        )
+
+
+def _write_managed_volume(
+    path: Path,
+    catalog_name: str,
+    schema_name: str,
+    volume_name: str,
+    client: 'DbxIOClient',
+    max_concurrency: int,
+    create_volume_if_not_exists: bool,
+    force: bool,
+):
     volume = Volume(
         catalog=catalog_name,
         schema=schema_name,
         name=volume_name,
-        volume_type=VolumeType.EXTERNAL,
-        storage_location=storage_location,
+        volume_type=VolumeType.MANAGED,
     )
-
-    if not _exists_volume(volume, client):
-        if create_volume_if_not_exists:
-            create_volume(volume=volume, client=client)
-        else:
-            raise ValueError(
-                f'Volume {volume_name} does not exist in schema {schema_name} of catalog '
-                f'{catalog_name} and create_volume_if_not_exists is False.'
+    create_volume(volume=volume, client=client)
+    for file in path.glob('**/*'):
+        if file.is_file() and not file.name.startswith('.'):
+            file_name = file.relative_to(path) if file != path else file.name
+            client.workspace_api.files.upload(
+                file_path=f'/Volumes/{catalog_name}/{schema_name}/{volume_name}/{file_name}',
+                contents=file.open('rb'),
+                overwrite=force,
             )
+
+
+def write_volume(
+    path: Union[str, Path],
+    catalog_name: str,
+    schema_name: str,
+    volume_name: str,
+    client: 'DbxIOClient',
+    volume_type: VolumeType = VolumeType.EXTERNAL,
+    create_volume_if_not_exists: bool = True,
+    max_concurrency: int = 1,
+    force: bool = False,
+) -> None:
+    """
+    writes the contents of a local directory to a volume in Databricks.
+
+    :param path: local directory or file to upload
+    :param catalog_name: databricks catalog name
+    :param schema_name: databricks schema name
+    :param volume_name: volume name
+    :param client: dbxio client
+    :param volume_type: volume type (external or managed)
+    :param create_volume_if_not_exists: flag to create the volume if it does not exist
+    :param max_concurrency: the maximum number of threads to use for uploading files
+    :param force: a flag to break leases if the blob is already in use
+    """
+    path = Path(path)
+
+    if volume_type is VolumeType.EXTERNAL:
+        _write_method = _write_external_volume
+    elif volume_type is VolumeType.MANAGED:
+        _write_method = _write_managed_volume
+    else:
+        raise ValueError(f'Unknown volume type: {volume_type}')
+
+    _write_method(
+        path=path,
+        catalog_name=catalog_name,
+        schema_name=schema_name,
+        volume_name=volume_name,
+        client=client,
+        max_concurrency=max_concurrency,
+        create_volume_if_not_exists=create_volume_if_not_exists,
+        force=force,
+    )
 
 
 def set_tags_on_volume(volume: Volume, tags: dict[str, str], client: 'DbxIOClient') -> _FutureBaseResult:
@@ -341,3 +419,21 @@ def get_comment_on_volume(volume: Volume, client: 'DbxIOClient') -> Union[str, N
             return row['comment']
 
     return None
+
+
+@retry(stop=stop_after_attempt(3), wait=wait_fixed(10))
+def drop_volume(volume: Volume, client: 'DbxIOClient') -> None:
+    """
+    Deletes a volume in Databricks.
+    If the volume is external, it will also delete all blobs in the storage location.
+    """
+    if volume.volume_type is VolumeType.EXTERNAL:
+        object_storage = ObjectStorageClient.from_url(volume.storage_location)
+        for blob in object_storage.list_blobs(object_storage.blobs_path):
+            object_storage.try_delete_blob(blob.name)
+            logger.debug(f'Blob {blob.name} was successfully deleted.')
+
+        logger.info(f'External volume {volume.safe_full_name} was successfully cleaned up.')
+
+    client.workspace_api.volumes.delete(volume.full_name)
+    logger.info(f'Volume {volume.safe_full_name} was successfully dropped.')

@@ -336,16 +336,32 @@ To break all leases, pass `force=True` to `bulk_write_local_files` function.
 
 ## Volume operations
 
+There are two types of Volumes in Databricks: managed and external.
+You can read more about them in the
+Databricks [documentation](https://docs.databricks.com/en/sql/language-manual/sql-ref-volumes.html).
+
+`dbxio` fully supports both types.
+
+Working with data in external Volume will be done using SDK your cloud provider.
+To work with managed Volume `dbxio` uses [Databricks Files API](https://docs.databricks.com/api/workspace/files).
+
+> [!NOTE]
+> Databricks API allows downloading/uploading files up to 5GB in managed Volumes.
+> If you need to download bigger files, consider using external Volume or splitting the file into smaller parts.
+
 ### Upload to Volume non-tabular data
 
-To work with Volumes in Databricks, you need to make sure that your target catalog has associated external storage.
-
-`dbxio` will upload all found files to the external storage and then create external volume with a link to the storage.
+To work with external Volumes in Databricks, you need to make sure that your target
+catalog has associated external storage.
 
 Associated external storage is:
 
 - created external location in the Databricks workspace
 - stored desired container name in catalog's properties with key `default_external_location`
+
+> [!NOTE]
+> `dbxio` creates Volumes automatically on write operations. If you want to disable this behavior,
+> pass `create_volume_if_not_exists=False` to `write_volume` function.,
 
 ```python
 # dbxio will upload all found files in the directory (except "hidden" files)
@@ -356,21 +372,12 @@ dbxio.write_volume(
     schema_name='schema_name',
     volume_name='volume_name',
     client=...,
+    volume_type=dbxio.VolumeType.MANAGED,  # or EXTERNAL
     max_concurrency=8,
 )
 ```
 
 ### Download from Volume
-
-A volume can be managed or external.
-`dbxio` fully supports both types.
-Downloading data from an external location will be done using SDK your cloud provider.
-To download data from managed volume `dbxio`
-use [Databricks Files API](https://docs.databricks.com/api/workspace/files).
-
-> [!NOTE]
-> Databricks API allows downloading files up to 5GB.
-> If you need to download bigger files, consider using external Volume or splitting the file into smaller parts.
 
 ```python
 dbxio.download_volume(
@@ -380,6 +387,18 @@ dbxio.download_volume(
     volume_name='volume_name',
     client=...,
 )
+```
+
+### Delete Volume
+
+`dbxio` can delete Volumes in Databricks.
+If your Volume is external, it will delete all files in object storage first and then delete the Volume's metadata.
+
+```python
+# first we need to create a Volume object (it will fetch all required information from Databricks)
+volume = dbxio.Volume.from_url('/Volumes/<catalog>/<schema>/<volume_name>', client=...)
+
+dbxio.delete_volume(volume, client=...)
 ```
 
 ## Further docs

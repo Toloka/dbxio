@@ -63,3 +63,8 @@ class MockBlobServiceClient:
 
     def get_blob_client(self, container, blob):
         return MockBlobClient()
+
+
+class MockBlob:
+    def __init__(self, blob_name):
+        self.name = blob_name

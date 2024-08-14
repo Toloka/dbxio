@@ -4,17 +4,20 @@ from textwrap import dedent
 from unittest.mock import patch
 
 import pytest
-from databricks.sdk.service.catalog import VolumesAPI
+from databricks.sdk.service.catalog import VolumesAPI, VolumeType
 from databricks.sdk.service.files import DirectoryEntry, FilesAPI
 
 from dbxio import ClusterType
 from dbxio.core.client import DbxIOClient
+from dbxio.core.cloud.azure.object_storage import _AzureBlobStorageClientImpl
 from dbxio.volume.volume_commands import (
     Volume,
     _download_external_volume,
     _download_managed_volume,
     _download_single_file_from_managed_volume,
+    create_volume,
     download_volume,
+    drop_volume,
     get_comment_on_volume,
     get_tags_on_volume,
     set_comment_on_volume,
@@ -22,7 +25,13 @@ from dbxio.volume.volume_commands import (
     unset_comment_on_volume,
     unset_tags_on_volume,
 )
-from tests.mocks.azure import MockDefaultAzureCredential
+from tests.mocks.azure import (
+    MockBlob,
+    MockBlobLeaseClient,
+    MockBlobServiceClient,
+    MockContainerClient,
+    MockDefaultAzureCredential,
+)
 from tests.mocks.databricks.sdk.service.files import (
     MockDownloadResult,
     mock_volume_info_external,
@@ -61,6 +70,28 @@ client = DbxIOClient.from_cluster_settings(
     cluster_type=ClusterType.SQL_WAREHOUSE,
     az_cred_provider=MockDefaultAzureCredential(),
 )
+
+
+@patch.object(VolumesAPI, 'create', return_value=None)
+@patch('dbxio.volume.volume_commands._exists_volume', return_value=False)
+def test_create_volume(mock_exists_volume, mock_volume_create):
+    volume = Volume(catalog='catalog', schema='schema', name='volume')
+    create_volume(volume, client)
+    mock_volume_create.assert_called_once_with(
+        catalog_name='catalog',
+        schema_name='schema',
+        name='volume',
+        volume_type=VolumeType.MANAGED,
+        storage_location=None,
+    )
+
+
+@patch.object(VolumesAPI, 'create', return_value=None)
+@patch('dbxio.volume.volume_commands._exists_volume', return_value=True)
+def test_create_volume__volume_exists(mock_exists_volume, mock_volume_create):
+    volume = Volume(catalog='catalog', schema='schema', name='volume')
+    create_volume(volume, client)
+    mock_volume_create.assert_not_called()
 
 
 @patch.object(DbxIOClient, 'sql', side_effect=sql_mock)
@@ -253,3 +284,38 @@ def test_download_volume__managed_type(
                     Path(temp_dir) / 'path' / 'to' / 'dir' / 'file3.parquet',
                 ]
             )
+
+
+@patch.object(VolumesAPI, 'delete', return_value=None)
+def test_drop_volume__managed(mock_volume_delete):
+    drop_volume(volume, client)
+    mock_volume_delete.assert_called_once_with(volume.full_name)
+
+
+@patch('dbxio.core.cloud.azure.object_storage.BlobLeaseClient', side_effect=MockBlobLeaseClient)
+@patch('dbxio.core.cloud.azure.object_storage.BlobServiceClient', side_effect=MockBlobServiceClient)
+@patch.object(VolumesAPI, 'delete', return_value=None)
+@patch.object(
+    MockContainerClient,
+    'list_blobs',
+    return_value=[MockBlob('path/to/file.parquet'), MockBlob('path/to/dir/file.parquet')],
+)
+@patch.object(_AzureBlobStorageClientImpl, 'try_delete_blob', return_value=None)
+def test_drop_volume__external(
+    mock_try_delete_blob,
+    mock_list_blobs,
+    mock_volume_delete,
+    mock_blob_service_client,
+    mock_blob_lease_client,
+):
+    volume = Volume(
+        catalog='catalog',
+        schema='schema',
+        name='volume',
+        volume_type=VolumeType.EXTERNAL,
+        storage_location='abfss://container@storage_account.dfs.core.windows.net/path',
+    )
+    drop_volume(volume, client)
+    mock_volume_delete.assert_called_once_with(volume.full_name)
+
+    assert mock_try_delete_blob.call_count == 2

@@ -60,9 +60,9 @@ class Volume:
         _, catalog, schema, name = url.lstrip('/').split('/')
         raw_volume_info = client.workspace_api.volumes.read(f'{catalog}.{schema}.{name}')
         return cls(
-            catalog=raw_volume_info.catalog_name,
-            schema=raw_volume_info.schema_name,
-            name=raw_volume_info.name,
+            catalog=catalog,
+            schema=schema,
+            name=name,
             volume_type=VolumeType(raw_volume_info.volume_type),
             storage_location=raw_volume_info.storage_location,
         )
@@ -428,6 +428,7 @@ def drop_volume(volume: Volume, client: 'DbxIOClient') -> None:
     If the volume is external, it will also delete all blobs in the storage location.
     """
     if volume.volume_type is VolumeType.EXTERNAL:
+        assert volume.storage_location, f'External volume must have a storage location, got {volume.storage_location=}'
         object_storage = ObjectStorageClient.from_url(volume.storage_location)
         for blob in object_storage.list_blobs(object_storage.blobs_path):
             object_storage.try_delete_blob(blob.name)

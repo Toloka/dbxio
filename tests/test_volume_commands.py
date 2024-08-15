@@ -1,4 +1,5 @@
 from pathlib import Path
+from shutil import rmtree
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 from unittest.mock import patch
@@ -54,13 +55,40 @@ def mock_list_directory_contents_return_values():
     )
 
 
-def _mock_download_blob_tree(object_storage_client, local_path: Path, prefix_path):
-    with open(local_path / 'test_file', 'w') as f:
-        f.write('test')
+@pytest.fixture
+def mock_list_directory_contents_return_values_filtered():
+    yield iter(
+        [
+            DirectoryEntry(path='path', is_directory=True, name='path'),
+            DirectoryEntry(path='path/to', is_directory=True, name='to'),
+            DirectoryEntry(path='path/to/dir', is_directory=True, name='dir'),
+            DirectoryEntry(path='path/to/dir/file3.parquet', is_directory=False, name='file3.parquet'),
+        ]
+    )
 
-    (Path(local_path) / 'subdir').mkdir()
-    with open(local_path / 'subdir' / 'test_file', 'w') as f:
-        f.write('test')
+
+def _mock_download_blob_tree(object_storage_client, local_path: Path, prefix_path):
+    """
+    File structure: path/to/blobs
+    dir/file
+    dir/subdir/file
+    dir/subdir/subdir2/file
+    """
+    (local_path / 'dir' / 'subdir' / 'subdir2').mkdir(parents=True, exist_ok=True)
+    (local_path / 'dir' / 'file').touch()
+    (local_path / 'dir' / 'subdir' / 'file').touch()
+    (local_path / 'dir' / 'subdir' / 'subdir2' / 'file').touch()
+    if prefix_path == 'dir':
+        return
+
+    for path in local_path.glob('**/*'):
+        relative_path = str(path.relative_to(local_path))
+        if prefix_path.startswith(relative_path):
+            continue
+        if not relative_path.startswith(prefix_path):
+            if path.is_dir():
+                rmtree(path, ignore_errors=True)
+            path.unlink()
 
 
 volume = Volume(catalog='catalog', schema='schema', name='volume')
@@ -187,15 +215,18 @@ def test_get_tags_on_volume(mock_sql):
 
 @patch('dbxio.volume.volume_commands.download_blob_tree', side_effect=_mock_download_blob_tree)
 def test_download_external_volume(mock_download_blob_tree):
-    storage_location = 'abfss://container@storage_account.dfs.core.windows.net/path/to/blobs'
+    storage_location = 'abfss://container@storage_account.dfs.core.windows.net/dir'
     with TemporaryDirectory() as temp_dir:
-        _download_external_volume(Path(temp_dir), storage_location)
+        _download_external_volume(Path(temp_dir), storage_location, '')
 
         assert sorted(Path(temp_dir).glob('**/*')) == sorted(
             [
-                Path(temp_dir) / 'subdir',
-                Path(temp_dir) / 'test_file',
-                Path(temp_dir) / 'subdir' / 'test_file',
+                Path(temp_dir) / 'dir',
+                Path(temp_dir) / 'dir' / 'file',
+                Path(temp_dir) / 'dir' / 'subdir',
+                Path(temp_dir) / 'dir' / 'subdir' / 'file',
+                Path(temp_dir) / 'dir' / 'subdir' / 'subdir2',
+                Path(temp_dir) / 'dir' / 'subdir' / 'subdir2' / 'file',
             ]
         )
 
@@ -218,8 +249,9 @@ def test_download_single_file_from_managed_volume():
             )
 
 
+@patch('dbxio.volume.volume_commands._check_if_path_is_remote_file', return_value=False)
 @patch.object(FilesAPI, 'download', return_value=MockDownloadResult())
-def test_download_managed_volume(mock_files_download, mock_list_directory_contents_return_values):
+def test_download_managed_volume(mock_files_download, mock_check_file, mock_list_directory_contents_return_values):
     with patch.object(
         FilesAPI,
         'list_directory_contents',
@@ -251,17 +283,45 @@ def test_download_volume__external_type(mock_volume_read, mock_download_blob_tre
 
         assert sorted(Path(temp_dir).glob('**/*')) == sorted(
             [
-                Path(temp_dir) / 'subdir',
-                Path(temp_dir) / 'test_file',
-                Path(temp_dir) / 'subdir' / 'test_file',
+                Path(temp_dir) / 'dir',
+                Path(temp_dir) / 'dir' / 'file',
+                Path(temp_dir) / 'dir' / 'subdir',
+                Path(temp_dir) / 'dir' / 'subdir' / 'file',
+                Path(temp_dir) / 'dir' / 'subdir' / 'subdir2',
+                Path(temp_dir) / 'dir' / 'subdir' / 'subdir2' / 'file',
             ]
         )
 
 
+@patch('dbxio.volume.volume_commands.download_blob_tree', side_effect=_mock_download_blob_tree)
+@patch.object(VolumesAPI, 'read', return_value=mock_volume_info_external)
+def test_download_volume__external_type_with_volume_path(mock_volume_read, mock_download_blob_tree):
+    with TemporaryDirectory() as temp_dir:
+        download_volume(
+            path=Path(temp_dir),
+            catalog_name='catalog',
+            schema_name='schema',
+            volume_name='volume',
+            client=client,
+            volume_path='subdir',
+        )
+
+        assert sorted(Path(temp_dir).glob('**/*')) == sorted(
+            [
+                Path(temp_dir) / 'dir',
+                Path(temp_dir) / 'dir' / 'subdir',
+                Path(temp_dir) / 'dir' / 'subdir' / 'file',
+                Path(temp_dir) / 'dir' / 'subdir' / 'subdir2',
+                Path(temp_dir) / 'dir' / 'subdir' / 'subdir2' / 'file',
+            ]
+        )
+
+
+@patch('dbxio.volume.volume_commands._check_if_path_is_remote_file', return_value=False)
 @patch.object(FilesAPI, 'download', return_value=MockDownloadResult())
 @patch.object(VolumesAPI, 'read', return_value=mock_volume_info_managed)
 def test_download_volume__managed_type(
-    mock_volume_read, mock_files_download, mock_list_directory_contents_return_values
+    mock_volume_read, mock_files_download, mock_check_file, mock_list_directory_contents_return_values
 ):
     with patch.object(
         FilesAPI,
@@ -281,6 +341,34 @@ def test_download_volume__managed_type(
                 [
                     Path(temp_dir) / 'path' / 'to' / 'file1.parquet',
                     Path(temp_dir) / 'path' / 'to' / 'file2.parquet',
+                    Path(temp_dir) / 'path' / 'to' / 'dir' / 'file3.parquet',
+                ]
+            )
+
+
+@patch('dbxio.volume.volume_commands._check_if_path_is_remote_file', return_value=False)
+@patch.object(FilesAPI, 'download', return_value=MockDownloadResult())
+@patch.object(VolumesAPI, 'read', return_value=mock_volume_info_managed)
+def test_download_volume__managed_type_with_volume_path(
+    mock_volume_read, mock_files_download, mock_check_file, mock_list_directory_contents_return_values_filtered
+):
+    with patch.object(
+        FilesAPI,
+        'list_directory_contents',
+        side_effect=lambda *args, **kwargs: mock_list_directory_contents_return_values_filtered,
+    ):
+        with TemporaryDirectory() as temp_dir:
+            download_volume(
+                path=Path(temp_dir),
+                catalog_name='catalog',
+                schema_name='schema',
+                volume_name='volume',
+                client=client,
+                volume_path='path/to/dir',
+            )
+
+            assert sorted(Path(temp_dir).glob('**/*.parquet')) == sorted(
+                [
                     Path(temp_dir) / 'path' / 'to' / 'dir' / 'file3.parquet',
                 ]
             )

@@ -280,7 +280,7 @@ def bulk_write_local_files(
                 filename,  # type: ignore
                 p,
                 object_storage_client=object_storage,
-                operation_uuid=operation_uuid,
+                prefix_blob_path=operation_uuid,
                 blobs=blobs,
                 metablobs=metablobs,
                 max_concurrency=max_concurrency,

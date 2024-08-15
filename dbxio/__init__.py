@@ -4,4 +4,4 @@ from dbxio.sql import *  # noqa: F403
 from dbxio.utils import *  # noqa: F403
 from dbxio.volume import *  # noqa: F403
 
-__version__ = '0.3.0'  # single source of truth
+__version__ = '0.4.0'  # single source of truth

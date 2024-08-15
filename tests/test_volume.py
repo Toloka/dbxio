@@ -1,17 +1,28 @@
-import pytest
-from databricks.sdk.service.catalog import VolumeType
+from unittest.mock import patch
 
-from dbxio import Volume
+import pytest
+from databricks.sdk.service.catalog import VolumesAPI, VolumeType
+
+import dbxio
+from tests.mocks.azure import MockDefaultAzureCredential
+from tests.mocks.databricks.sdk.service.files import mock_volume_info_external
+
+client = dbxio.DbxIOClient.from_cluster_settings(
+    http_path='test_sql_endpoint_path',
+    server_hostname='test_host_name',
+    cluster_type=dbxio.ClusterType.SQL_WAREHOUSE,
+    az_cred_provider=MockDefaultAzureCredential(),
+)
 
 
 def test_managed_volume():
-    v = Volume(catalog='catalog', schema='schema', name='name', volume_type=VolumeType.MANAGED)
+    v = dbxio.Volume(catalog='catalog', schema='schema', name='name', volume_type=VolumeType.MANAGED)
 
     assert v.is_managed()
 
 
 def test_external_volume():
-    v = Volume(
+    v = dbxio.Volume(
         catalog='catalog',
         schema='schema',
         name='name',
@@ -23,16 +34,27 @@ def test_external_volume():
 
 
 def test_full_name():
-    v = Volume(catalog='catalog', schema='schema', name='name')
+    v = dbxio.Volume(catalog='catalog', schema='schema', name='name')
     assert v.full_name == 'catalog.schema.name'
     assert v.safe_full_name == '`catalog`.`schema`.`name`'
 
 
 def test_mount_path():
-    v = Volume(catalog='catalog', schema='schema', name='name')
+    v = dbxio.Volume(catalog='catalog', schema='schema', name='name')
     assert v.mount_path == '/Volumes/catalog/schema/name'
 
 
 def test_external_volume_without_storage_location():
     with pytest.raises(ValueError):
-        Volume(catalog='catalog', schema='schema', name='name', volume_type=VolumeType.EXTERNAL)
+        dbxio.Volume(catalog='catalog', schema='schema', name='name', volume_type=VolumeType.EXTERNAL)
+
+
+@patch.object(VolumesAPI, 'read', return_value=mock_volume_info_external)
+def test_volume_from_url(mock_read):
+    v = dbxio.Volume.from_url('/Volumes/catalog/schema/name', client)
+    assert v.mount_path == '/Volumes/catalog/schema/name'
+    assert v.catalog == 'catalog'
+    assert v.schema == 'schema'
+    assert v.name == 'name'
+    assert v.volume_type == VolumeType.EXTERNAL
+    assert v.storage_location == mock_volume_info_external.storage_location

@@ -377,6 +377,25 @@ dbxio.write_volume(
 )
 ```
 
+#### Upload single file (or files by prefix path) to existing Volume
+
+If you want to add or modify files in existing Volume, you can use `volume_path` parameter to specify the path in
+Volume.
+
+The code below will add or modify file `file.txt` on the path `path/in/volume/file.txt` in Volume.
+If Volume does not exist, it will be created.
+
+```python
+dbxio.write_volume(
+    path='path/to/file.txt',
+    catalog_name='catalog_name',
+    schema_name='schema_name',
+    volume_name='volume_name',
+    client=...,
+    volume_path='path/in/volume',
+)
+```
+
 ### Download from Volume
 
 ```python
@@ -386,6 +405,24 @@ dbxio.download_volume(
     schema_name='schema_name',
     volume_name='volume_name',
     client=...,
+)
+```
+
+#### Download files by prefix path from Volume
+
+It's also possible to download files by prefix path from Volume.
+
+Code below will download all files from the path `path/in/volume` in Volume to the local
+directory `local/path/to/download`.
+
+```python
+dbxio.download_volume(
+    path='local/path/to/download',
+    catalog_name='catalog_name',
+    schema_name='schema_name',
+    volume_name='volume_name',
+    client=...,
+    volume_path='path/in/volume',
 )
 ```
 

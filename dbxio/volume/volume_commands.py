@@ -1,5 +1,3 @@
-import os
-import uuid
 from pathlib import Path
 from textwrap import dedent
 from typing import TYPE_CHECKING, Optional, Union
@@ -43,10 +41,6 @@ class Volume:
     )
     storage_location: Union[str, None] = None
 
-    def __attrs_post_init__(self):
-        if self.volume_type == VolumeType.EXTERNAL and not self.storage_location:
-            raise ValueError('storage_location is required for external volumes')
-
     @classmethod
     def from_url(cls, url: str, client: 'DbxIOClient') -> 'Volume':
         """
@@ -89,6 +83,10 @@ class Volume:
     @property
     def mount_path(self):
         return str(Path(f'/Volumes/{self.catalog}/{self.schema}/{self.name}') / self.path)
+
+    @property
+    def mount_start_point(self):
+        return f'volume__{self.name}'
 
     def is_managed(self):
         return self.volume_type is VolumeType.MANAGED
@@ -228,8 +226,15 @@ def _write_external_volume(
         ), f'Object storage client must have a blobs path, got {object_storage_client=}'
         prefix_blob_path = str(Path(object_storage_client.blobs_path.rstrip('/')) / volume_path)
     else:
+        volume = Volume(
+            catalog=catalog_name,
+            schema=schema_name,
+            name=volume_name,
+            path=volume_path,
+            volume_type=VolumeType.EXTERNAL,
+        )
         object_storage_client = ObjectStorageClient.from_url(get_external_location_storage_url(catalog_name, client))
-        prefix_blob_path = str(Path(str(uuid.uuid4())) / volume_path)
+        prefix_blob_path = str(Path(volume.mount_start_point) / volume_path)
 
     with blobs_registries(object_storage_client, keep_blobs=True) as (blobs, metablobs):
         # here all files in the path, including subdirectories, are uploaded to the blob storage.
@@ -250,23 +255,9 @@ def _write_external_volume(
     if volume_exists:
         return
 
-    blobs_without_volume_path = [b.replace(f'/{volume_path}' if volume_path else '', '') for b in blobs]
-    _common_path = Path(str(os.path.commonpath(blobs_without_volume_path)))
-    blobs_path = _common_path if not _common_path.suffix else _common_path.parent
-    object_storage_client.blobs_path = str(blobs_path)
-    storage_location = object_storage_client.to_url()
-
-    volume = Volume(
-        catalog=catalog_name,
-        schema=schema_name,
-        name=volume_name,
-        volume_type=VolumeType.EXTERNAL,
-        storage_location=storage_location,
-    )
-    create_volume(
-        volume=volume,
-        client=client,
-    )
+    object_storage_client.blobs_path = volume.mount_start_point
+    volume.storage_location = object_storage_client.to_url()
+    create_volume(volume=volume, client=client)
 
 
 def _write_managed_volume(

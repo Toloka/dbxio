@@ -17,9 +17,9 @@ _LOCK_SUFFIX = '_LOCK'
 logger = get_logger()
 
 
-def _local_path_to_blob_name(file_path: Path, local_path: Path, operation_uuid: str) -> str:
-    relative_path = file_path.relative_to(local_path) if file_path != local_path else file_path.name
-    return f'{operation_uuid}/{relative_path}'
+def _local_path_to_blob_name(file_path: Path, local_path: Path, prefix_blob_path: str) -> str:
+    relative_path: Union[Path, str] = file_path.relative_to(local_path) if file_path != local_path else file_path.name
+    return str(Path(prefix_blob_path) / Path(relative_path))
 
 
 def _get_file_hash(file_path: Path) -> str:
@@ -60,10 +60,10 @@ def _lock_blob(blob_name: str, object_storage_client: 'ObjectStorageClient', for
 def upload_file(
     path: Union[str, Path],
     local_path: Union[str, Path],
+    prefix_blob_path: str,
     object_storage_client: 'ObjectStorageClient',
     blobs: list[str],
     metablobs: list[str],
-    operation_uuid: str,
     max_concurrency: int = 1,
     force: bool = False,
 ) -> str:
@@ -77,7 +77,7 @@ def upload_file(
     logger.debug(f'Using {max_concurrency} threads for uploading {path}')
 
     file_hash = _get_file_hash(path)
-    blob_name = _local_path_to_blob_name(path, local_path, operation_uuid)
+    blob_name = _local_path_to_blob_name(path, local_path, prefix_blob_path)
     metablobs.append(f'{blob_name}{_LOCK_SUFFIX}')
     metablobs.append(f'{blob_name}{_SUCCESS_SUFFIX}')
     metablobs.append(f'{blob_name}{_HASHSUM_SUFFIX}')

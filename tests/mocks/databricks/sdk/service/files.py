@@ -13,7 +13,7 @@ mock_volume_info_external = VolumeInfo(
     schema_name='schema',
     name='volume',
     volume_type=VolumeType.EXTERNAL,
-    storage_location='abfss://container@storage_account.dfs.core.windows.net/path/to/blobs',
+    storage_location='abfss://container@storage_account.dfs.core.windows.net/dir',
 )
 
 mock_volume_info_managed = VolumeInfo(

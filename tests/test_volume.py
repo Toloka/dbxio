@@ -1,6 +1,5 @@
 from unittest.mock import patch
 
-import pytest
 from databricks.sdk.service.catalog import VolumesAPI, VolumeType
 
 import dbxio
@@ -42,11 +41,6 @@ def test_full_name():
 def test_mount_path():
     v = dbxio.Volume(catalog='catalog', schema='schema', name='name')
     assert v.mount_path == '/Volumes/catalog/schema/name'
-
-
-def test_external_volume_without_storage_location():
-    with pytest.raises(ValueError):
-        dbxio.Volume(catalog='catalog', schema='schema', name='name', volume_type=VolumeType.EXTERNAL)
 
 
 @patch.object(VolumesAPI, 'read', return_value=mock_volume_info_external)

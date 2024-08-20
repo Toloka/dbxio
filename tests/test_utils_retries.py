@@ -1,15 +1,20 @@
+import pytest
 from databricks.sdk.errors.platform import PermissionDenied
 from tenacity import stop_after_attempt, wait_fixed
 
 from dbxio import ClusterType, DbxIOClient, dbxio_retry
 from tests.mocks.azure import MockDefaultAzureCredential
 
-client = DbxIOClient.from_cluster_settings(
-    http_path='test_sql_endpoint_path',
-    server_hostname='test_host_name',
-    cluster_type=ClusterType.SQL_WAREHOUSE,
-    az_cred_provider=MockDefaultAzureCredential(),
-)
+
+@pytest.fixture
+def mock_client():
+    return DbxIOClient.from_cluster_settings(
+        http_path='test_sql_endpoint_path',
+        server_hostname='test_host_name',
+        cluster_type=ClusterType.SQL_WAREHOUSE,
+        az_cred_provider=MockDefaultAzureCredential(),
+    )
+
 
 N_RETRIES = 2
 
@@ -28,13 +33,13 @@ def _some_function_with_unknown_exception(arg1, arg2, client: DbxIOClient, kwarg
     raise UnknownException('Unknown exception')
 
 
-def test_dbxio_retry():
+def test_dbxio_retry(mock_client):
     func = _some_function.retry_with(
         stop=stop_after_attempt(N_RETRIES),
         wait=wait_fixed(0),
     )
     try:
-        func(1, 2, client, kwarg1=3, kwarg2=4)
+        func(1, 2, mock_client, kwarg1=3, kwarg2=4)
     except PermissionDenied:
         pass
 
@@ -44,13 +49,13 @@ def test_dbxio_retry():
     assert attempt_number == N_RETRIES
 
 
-def test_dbxio_retry_unknown_exception():
+def test_dbxio_retry_unknown_exception(mock_client):
     func = _some_function_with_unknown_exception.retry_with(
         stop=stop_after_attempt(N_RETRIES * 100),
         wait=wait_fixed(0),
     )
     try:
-        func(1, 2, client, kwarg1=3, kwarg2=4)
+        func(1, 2, mock_client, kwarg1=3, kwarg2=4)
     except UnknownException:
         pass
 

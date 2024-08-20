@@ -10,6 +10,7 @@ from databricks.sql import ServerOperationError
 from dbxio.blobs.block_upload import upload_file
 from dbxio.blobs.parquet import create_pa_table, create_tmp_parquet, pa_table2parquet
 from dbxio.core.cloud.client.object_storage import ObjectStorageClient
+from dbxio.core.exceptions import ReadDataError
 from dbxio.delta.parsers import infer_schema
 from dbxio.delta.table import Table, TableFormat
 from dbxio.sql.query import ConstDatabricksQuery
@@ -34,7 +35,7 @@ def exists_table(table: Union[str, Table], client: 'DbxIOClient') -> bool:
     try:
         next(read_table(table, limit_records=1, client=client))
         return True
-    except ServerOperationError:
+    except (ServerOperationError, ReadDataError):
         return False
 
 

@@ -52,6 +52,10 @@ class BaseAuthProvider(ABC):
     ) -> ClusterCredentials:
         raise NotImplementedError
 
+    @abstractmethod
+    def clear_cache(self):
+        raise NotImplementedError
+
     @classmethod
     def from_semi_configured_credentials(
         cls,
@@ -100,6 +104,9 @@ class ClusterEnvAuthProvider(BaseAuthProvider):
 
     _cache: TTLCache = attrs.Factory(lambda: TTLCache(maxsize=1024, ttl=60 * 15))
 
+    def clear_cache(self):
+        self._cache.clear()
+
     @cachedmethod(lambda self: self._cache)
     def get_credentials(self) -> ClusterCredentials:
         try:
@@ -124,6 +131,9 @@ class ClusterAirflowAuthProvider(BaseAuthProvider):
     )
 
     _cache: TTLCache = attrs.Factory(lambda: TTLCache(maxsize=1024, ttl=60 * 15))
+
+    def clear_cache(self):
+        self._cache.clear()
 
     @cachedmethod(lambda self: self._cache)
     def get_credentials(
@@ -175,6 +185,10 @@ class DefaultCredentialProvider:
             ), 'semi_configured_credentials must be provided if not lazy'
             self.ensure_set_auth_provider()
 
+    def clear_cache(self):
+        if self._successful_provider is not None:
+            self._successful_provider.clear_cache()
+
     def ensure_set_auth_provider(self) -> None:
         for provider_type in self._chain:
             try:
@@ -211,6 +225,9 @@ class BareAuthProvider(BaseAuthProvider):
     az_cred_provider: AZ_CRED_PROVIDER_TYPE = attrs.field(factory=DefaultAzureCredential)
 
     semi_configured_credentials: None = attrs.field(default=None, init=False)
+
+    def clear_cache(self):
+        pass
 
     @cache
     def get_credentials(self, **kwargs) -> ClusterCredentials:

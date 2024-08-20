@@ -16,6 +16,7 @@ from dbxio.sql.query import ConstDatabricksQuery
 from dbxio.sql.results import _FutureBaseResult
 from dbxio.utils.blobs import blobs_registries
 from dbxio.utils.logging import get_logger
+from dbxio.utils.retries import dbxio_retry
 
 if TYPE_CHECKING:
     from dbxio.core import DbxIOClient
@@ -23,6 +24,7 @@ if TYPE_CHECKING:
 logger = get_logger()
 
 
+@dbxio_retry
 def exists_table(table: Union[str, Table], client: 'DbxIOClient') -> bool:
     """
     Checks if table exists in the catalog. Tries to read one record from the table.
@@ -36,6 +38,7 @@ def exists_table(table: Union[str, Table], client: 'DbxIOClient') -> bool:
         return False
 
 
+@dbxio_retry
 def create_table(table: Union[str, Table], client: 'DbxIOClient') -> _FutureBaseResult:
     """
     Creates a table in the catalog.
@@ -57,6 +60,7 @@ def create_table(table: Union[str, Table], client: 'DbxIOClient') -> _FutureBase
     return client.sql(query)
 
 
+@dbxio_retry
 def drop_table(table: Union[str, Table], client: 'DbxIOClient', force: bool = False) -> _FutureBaseResult:
     """
     Drops a table from the catalog.
@@ -70,6 +74,7 @@ def drop_table(table: Union[str, Table], client: 'DbxIOClient', force: bool = Fa
     return client.sql(drop_sql)
 
 
+@dbxio_retry
 def read_table(
     table: Union[str, Table],
     client: 'DbxIOClient',
@@ -102,6 +107,7 @@ def read_table(
                 yield record
 
 
+@dbxio_retry
 def save_table_to_files(
     table: Union[str, Table],
     client: 'DbxIOClient',
@@ -121,6 +127,7 @@ def save_table_to_files(
     return client.sql_to_files(sql_read_query, results_path=results_path, max_concurrency=max_concurrency)
 
 
+@dbxio_retry
 def write_table(
     table: Union[str, Table],
     new_records: Union[Iterator[Dict], List[Dict]],
@@ -172,6 +179,7 @@ def write_table(
     return client.sql(_sql_query)
 
 
+@dbxio_retry
 def copy_into_table(
     client: 'DbxIOClient',
     table: Table,
@@ -199,6 +207,7 @@ def copy_into_table(
     client.sql(sql_copy_into_query).wait()
 
 
+@dbxio_retry
 def bulk_write_table(
     table: Union[str, Table],
     new_records: Union[Iterator[Dict], List[Dict]],
@@ -248,6 +257,7 @@ def bulk_write_table(
         )
 
 
+@dbxio_retry
 def bulk_write_local_files(
     table: Table,
     path: str,
@@ -304,6 +314,7 @@ def bulk_write_local_files(
         )
 
 
+@dbxio_retry
 def merge_table(
     table: 'Union[str , Table]',
     new_records: 'Union[Iterator[Dict] , List[Dict]]',
@@ -342,6 +353,7 @@ def merge_table(
         drop_table(tmp_table, client=client, force=True).wait()
 
 
+@dbxio_retry
 def set_comment_on_table(
     table: 'Union[str , Table]',
     comment: Union[str, None],
@@ -361,6 +373,7 @@ def set_comment_on_table(
     return client.sql(set_comment_query)
 
 
+@dbxio_retry
 def unset_comment_on_table(table: 'Union[str , Table]', client: 'DbxIOClient') -> _FutureBaseResult:
     """
     Unsets the comment on a table.
@@ -368,6 +381,7 @@ def unset_comment_on_table(table: 'Union[str , Table]', client: 'DbxIOClient') -
     return set_comment_on_table(table=table, comment=None, client=client)
 
 
+@dbxio_retry
 def get_comment_on_table(table: 'Union[str , Table]', client: 'DbxIOClient') -> Union[str, None]:
     """
     Returns the comment on a table.
@@ -390,6 +404,7 @@ def get_comment_on_table(table: 'Union[str , Table]', client: 'DbxIOClient') -> 
     return None
 
 
+@dbxio_retry
 def set_tags_on_table(table: 'Union[str , Table]', tags: dict[str, str], client: 'DbxIOClient') -> _FutureBaseResult:
     """
     Sets tags on a table.
@@ -406,6 +421,7 @@ def set_tags_on_table(table: 'Union[str , Table]', tags: dict[str, str], client:
     return client.sql(set_tags_query)
 
 
+@dbxio_retry
 def unset_tags_on_table(table: 'Union[str , Table]', tags: list[str], client: 'DbxIOClient') -> _FutureBaseResult:
     """
     Unsets tags on a table.
@@ -421,6 +437,7 @@ def unset_tags_on_table(table: 'Union[str , Table]', tags: list[str], client: 'D
     return client.sql(unset_tags_query)
 
 
+@dbxio_retry
 def get_tags_on_table(table: 'Union[str , Table]', client: 'DbxIOClient') -> dict[str, str]:
     """
     Returns the tags on a table.

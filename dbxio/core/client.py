@@ -41,6 +41,9 @@ class DbxIOClient:
 
     session_configuration: Optional[Dict[str, Any]] = None
 
+    def clear_cache(self):
+        self.credential_provider.clear_cache()
+
     @classmethod
     def from_cluster_settings(
         cls,

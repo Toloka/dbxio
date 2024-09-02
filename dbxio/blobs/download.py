@@ -22,6 +22,7 @@ def download_blob_tree(
         relative_blob_path = blob.name[len(prefix_path) + 1 :] if prefix_path else blob.name
         if not relative_blob_path:
             # if the prefix path is full path to one file
+            assert object_storage_client.blobs_path, 'blobs_path is not set'
             relative_blob_path = blob.name[len(object_storage_client.blobs_path) + 1 :]
 
         if is_dir:

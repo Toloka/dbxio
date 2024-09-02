@@ -55,6 +55,10 @@ class _AzureBlobStorageClientImpl(ObjectStorageClient):
         container_client = self.blob_service_client.get_container_client(self.container_name)
         return container_client.list_blobs(name_starts_with=prefix, **kwargs)
 
+    def is_directory(self, blob_name: str) -> bool:
+        blob_client = self.blob_service_client.get_container_client(self.container_name).get_blob_client(blob_name)
+        return blob_client.get_blob_properties().metadata.get('hdi_isfolder') == 'true'
+
     def download_blob(self, blob_name: str) -> bytes:
         blob_client = self.blob_service_client.get_blob_client(container=self.container_name, blob=blob_name)
         return blob_client.download_blob().readall()

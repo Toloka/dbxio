@@ -52,6 +52,10 @@ class ObjectStorageClient(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def is_directory(self, blob_name: str) -> bool:
+        raise NotImplementedError
+
+    @abstractmethod
     def download_blob(self, blob_name: str) -> bytes:
         raise NotImplementedError
 

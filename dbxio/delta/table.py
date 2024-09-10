@@ -102,9 +102,10 @@ class Table:
         """
         Returns table identifier with special characters replaced with underscores and wrapped in backticks.
         """
-        trunc_ti = self.table_identifier.translate(
-            str.maketrans('!"#$%&\'()*+,/:;<=>?@[\\]^`{|}~', '_____________________________')
-        )
+        translations = {ord(char): ord('_') for char in '!"#$%&\'()*+,/:;<=>?@[\\]^{|}~'}
+        translations[ord('`')] = None
+
+        trunc_ti = self.table_identifier.translate(translations)
         return '.'.join([f'`{ti_part}`' for ti_part in trunc_ti.split('.')])
 
     @property

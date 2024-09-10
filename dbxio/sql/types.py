@@ -662,6 +662,19 @@ class JSONType(BaseType):
         raise DbxIOTypeError(f'Cannot cast value `{obj}` to JSON')
 
 
+class VariantType(BaseType):
+    def fit(self, obj) -> bool:
+        return True
+
+    @nullable
+    def serialize(self, obj, unsafe: bool = False):
+        return str(obj)
+
+    @nullable
+    def deserialize(self, obj):
+        return obj
+
+
 class GroupsPrimaryDataTypes:
     INTEGER = (IntType, BigIntType, DecimalType)
     FLOAT = (FloatType, DoubleType)

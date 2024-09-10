@@ -3,7 +3,7 @@ from textwrap import dedent
 from typing import TYPE_CHECKING, Optional, Union
 
 import attrs
-from databricks.sdk.errors.platform import NotFound
+from databricks.sdk.errors.platform import NotFound, ResourceDoesNotExist
 from databricks.sdk.service.catalog import VolumeType
 
 from dbxio.blobs.block_upload import upload_file
@@ -98,7 +98,7 @@ class Volume:
 
 @dbxio_retry
 def create_volume(volume: Volume, client: 'DbxIOClient', skip_if_exists: bool = True) -> None:
-    if skip_if_exists and _exists_volume(volume.catalog, volume.schema, volume.name, client):
+    if skip_if_exists and exists_volume(volume.catalog, volume.schema, volume.name, client):
         logger.info(f'Volume {volume.safe_full_name} already exists, skipping creation.')
         return
 
@@ -113,7 +113,7 @@ def create_volume(volume: Volume, client: 'DbxIOClient', skip_if_exists: bool = 
 
 
 @dbxio_retry
-def _exists_volume(catalog_name: str, schema_name: str, volume_name: str, client: 'DbxIOClient') -> bool:
+def exists_volume(catalog_name: str, schema_name: str, volume_name: str, client: 'DbxIOClient') -> bool:
     for v in client.workspace_api.volumes.list(catalog_name=catalog_name, schema_name=schema_name):
         if v.name == volume_name:
             return True
@@ -223,7 +223,7 @@ def _write_external_volume(
     create_volume_if_not_exists: bool,
     force: bool,
 ):
-    volume_exists = _exists_volume(catalog_name, schema_name, volume_name, client)
+    volume_exists = exists_volume(catalog_name, schema_name, volume_name, client)
     if volume_exists:
         volume = Volume.from_url(get_volume_url(catalog_name, schema_name, volume_name), client=client)
         assert volume.storage_location, f'External volume must have a storage location, got {volume=}'
@@ -454,7 +454,7 @@ def get_comment_on_volume(volume: Volume, client: 'DbxIOClient') -> Union[str, N
 
 
 @dbxio_retry
-def drop_volume(volume: Volume, client: 'DbxIOClient') -> None:
+def drop_volume(volume: Volume, client: 'DbxIOClient', force: bool = False) -> None:
     """
     Deletes a volume in Databricks.
     If the volume is external, it will also delete all blobs in the storage location.
@@ -467,6 +467,9 @@ def drop_volume(volume: Volume, client: 'DbxIOClient') -> None:
             logger.debug(f'Blob {blob.name} was successfully deleted.')
 
         logger.info(f'External volume {volume.safe_full_name} was successfully cleaned up.')
-
-    client.workspace_api.volumes.delete(volume.full_name)
+    try:
+        client.workspace_api.volumes.delete(volume.full_name)
+    except ResourceDoesNotExist as e:
+        if not force:
+            raise e
     logger.info(f'Volume {volume.safe_full_name} was successfully dropped.')

@@ -5,6 +5,7 @@ from textwrap import dedent
 from unittest.mock import patch
 
 import pytest
+from databricks.sdk.errors.platform import ResourceDoesNotExist
 from databricks.sdk.service.catalog import VolumesAPI, VolumeType
 from databricks.sdk.service.files import DirectoryEntry, FilesAPI
 
@@ -101,8 +102,8 @@ client = DbxIOClient.from_cluster_settings(
 
 
 @patch.object(VolumesAPI, 'create', return_value=None)
-@patch('dbxio.volume.volume_commands._exists_volume', return_value=False)
-def test_create_volume(mock_exists_volume, mock_volume_create):
+@patch('dbxio.volume.volume_commands.exists_volume', return_value=False)
+def test_create_volume(mockexists_volume, mock_volume_create):
     volume = Volume(catalog='catalog', schema='schema', name='volume')
     create_volume(volume, client)
     mock_volume_create.assert_called_once_with(
@@ -115,8 +116,8 @@ def test_create_volume(mock_exists_volume, mock_volume_create):
 
 
 @patch.object(VolumesAPI, 'create', return_value=None)
-@patch('dbxio.volume.volume_commands._exists_volume', return_value=True)
-def test_create_volume__volume_exists(mock_exists_volume, mock_volume_create):
+@patch('dbxio.volume.volume_commands.exists_volume', return_value=True)
+def test_create_volume__volume_exists(mockexists_volume, mock_volume_create):
     volume = Volume(catalog='catalog', schema='schema', name='volume')
     create_volume(volume, client)
     mock_volume_create.assert_not_called()
@@ -407,3 +408,14 @@ def test_drop_volume__external(
     mock_volume_delete.assert_called_once_with(volume.full_name)
 
     assert mock_try_delete_blob.call_count == 2
+
+
+@patch.object(VolumesAPI, 'delete', side_effect=ResourceDoesNotExist())
+def test_drop_volume_force(mock_volume_delete):
+    volume = Volume(
+        catalog='catalog',
+        schema='schema',
+        name='volume',
+        volume_type=VolumeType.MANAGED,
+    )
+    drop_volume(volume, client, force=True)

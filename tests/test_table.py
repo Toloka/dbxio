@@ -48,3 +48,8 @@ class TestTable(unittest.TestCase):
             dbxio.Table(table_identifier='database!.schema.table+').safe_table_identifier,
             '`database_`.`schema`.`table_`',
         )
+
+        self.assertEqual(
+            dbxio.Table(table_identifier='`database!`.`schema`.`table+`').safe_table_identifier,
+            '`database_`.`schema`.`table_`',
+        )

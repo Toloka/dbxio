@@ -367,3 +367,12 @@ def test_json():
     assert types.JSONType().deserialize('1') == 1
     assert types.JSONType().deserialize('"a"') == 'a'
     assert types.JSONType().deserialize('NULL') is None
+
+
+def test_variant():
+    assert types.VariantType().fit(1)
+    assert types.VariantType().fit('a')
+    assert types.VariantType().fit(None)
+    assert types.VariantType().fit(datetime.datetime(2014, 1, 1, 0, 0, 0))
+    assert types.VariantType().fit([1, 2, 3])
+    assert types.VariantType().fit({'a': 1})

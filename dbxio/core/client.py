@@ -10,6 +10,9 @@ from dbxio.sql.query import BaseDatabricksQuery
 from dbxio.sql.results import _FutureBaseResult
 from dbxio.sql.sql_driver import SQLDriver, get_sql_driver
 from dbxio.utils.databricks import ClusterType
+from dbxio.utils.logging import get_logger
+
+logger = get_logger()
 
 
 @attrs.define(slots=True)
@@ -40,6 +43,18 @@ class DbxIOClient:
     settings: Settings = attrs.field(validator=attrs.validators.instance_of(Settings))
 
     session_configuration: Optional[Dict[str, Any]] = None
+
+    def __attrs_post_init__(self):
+        """
+        This method is used only for logging
+        """
+        logger.info(
+            'Client is created with the following settings: %s; cluster settings: http-path: %s, server-hostname: %s',
+            self.settings,
+            self._cluster_credentials.http_path,
+            self._cluster_credentials.server_hostname,
+        )
+        logger.info('Auth provider: %s', self.credential_provider.__class__.__name__)
 
     def clear_cache(self):
         self.credential_provider.clear_cache()

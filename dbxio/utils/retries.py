@@ -1,5 +1,11 @@
+import logging
+
 from databricks.sdk.errors.platform import PermissionDenied
-from tenacity import RetryCallState, retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import RetryCallState, after_log, retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+
+from dbxio.utils.logging import get_logger
+
+logger = get_logger()
 
 
 def _clear_client_cache(call_state: RetryCallState) -> None:
@@ -28,4 +34,5 @@ dbxio_retry = retry(
     retry=retry_if_exception_type((PermissionDenied,)),
     reraise=True,
     before=_clear_client_cache,
+    after=after_log(logger, log_level=logging.INFO),
 )

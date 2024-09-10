@@ -44,18 +44,6 @@ class DbxIOClient:
 
     session_configuration: Optional[Dict[str, Any]] = None
 
-    def __attrs_post_init__(self):
-        """
-        This method is used only for logging
-        """
-        logger.info(
-            'Client is created with the following settings: %s; cluster settings: http-path: %s, server-hostname: %s',
-            self.settings,
-            self._cluster_credentials.http_path,
-            self._cluster_credentials.server_hostname,
-        )
-        logger.info('Auth provider: %s', self.credential_provider.__class__.__name__)
-
     def clear_cache(self):
         self.credential_provider.clear_cache()
 
@@ -72,6 +60,15 @@ class DbxIOClient:
         """
         Create a client from the cluster settings. Use this method if you want to use PAT for authentication.
         """
+        logger.info(
+            'Creating a client from the cluster settings (http-path: %s, server-hostname: %s, '
+            'cluster-type: %s, az-cred-provider: %s, settings: %s)',
+            http_path,
+            server_hostname,
+            cluster_type,
+            az_cred_provider,
+            settings,
+        )
         provider = DefaultCredentialProvider(
             cluster_type=cluster_type,
             az_cred_provider=az_cred_provider,
@@ -91,6 +88,7 @@ class DbxIOClient:
         Create a client from the auth provider.
         Use this method if you want to generate a short-lived token based on the available authentication method.
         """
+        logger.info('Creating a client from the auth provider: %s', auth_provider.__class__.__name__)
         return cls(credential_provider=auth_provider, settings=settings or Settings(), **kwargs)
 
     @property

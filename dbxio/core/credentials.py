@@ -185,6 +185,10 @@ class DefaultCredentialProvider:
             ), 'semi_configured_credentials must be provided if not lazy'
             self.ensure_set_auth_provider()
 
+        logger.info(
+            'DefaultCredentialProvider is created with the following settings: %s', self.semi_configured_credentials
+        )
+
     def clear_cache(self):
         if self._successful_provider is not None:
             self._successful_provider.clear_cache()
@@ -225,6 +229,16 @@ class BareAuthProvider(BaseAuthProvider):
     az_cred_provider: AZ_CRED_PROVIDER_TYPE = attrs.field(factory=DefaultAzureCredential)
 
     semi_configured_credentials: None = attrs.field(default=None, init=False)
+
+    def __attrs_post_init__(self):
+        """
+        This method is used only for logging
+        """
+        logger.info(
+            'BareAuthProvider is created with the following settings ( http_path: %s, server_hostname: %s )',
+            self.http_path,
+            self.server_hostname,
+        )
 
     def clear_cache(self):
         pass

@@ -1,5 +1,5 @@
 import os
-from typing import Type
+from typing import Type, Union
 
 import attrs
 
@@ -20,8 +20,9 @@ def _cloud_provider_factory() -> CloudProvider:
 @attrs.frozen
 class RetryConfig:
     max_attempts: int = attrs.field(default=7, validator=[attrs.validators.instance_of(int), attrs.validators.ge(1)])
-    exponential_backoff_multiplier: int = attrs.field(
-        default=1, validator=[attrs.validators.instance_of(int), attrs.validators.ge(1)]
+    exponential_backoff_multiplier: Union[float, int] = attrs.field(
+        default=1.0,
+        validator=[attrs.validators.instance_of((float, int)), attrs.validators.ge(0)],
     )
     extra_exceptions_to_retry: tuple[Type[BaseException]] = attrs.field(
         factory=tuple,

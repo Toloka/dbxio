@@ -68,7 +68,7 @@ def mock_list_directory_contents_return_values_filtered():
     )
 
 
-def _mock_download_blob_tree(object_storage_client, local_path: Path, prefix_path):
+def _mock_download_blob_tree(object_storage_client, local_path: Path, client, prefix_path):
     """
     File structure: path/to/blobs
     dir/file
@@ -218,7 +218,7 @@ def test_get_tags_on_volume(mock_sql):
 def test_download_external_volume(mock_download_blob_tree):
     storage_location = 'abfss://container@storage_account.dfs.core.windows.net/dir'
     with TemporaryDirectory() as temp_dir:
-        _download_external_volume(Path(temp_dir), storage_location, '')
+        _download_external_volume(Path(temp_dir), storage_location, '', client=client)
 
         assert sorted(Path(temp_dir).glob('**/*')) == sorted(
             [

@@ -2,6 +2,8 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from tenacity import Retrying
+
     from dbxio.core.cloud.client.object_storage import ObjectStorageClient
 
 
@@ -13,6 +15,7 @@ def blobs_gc(blobs: list[str], object_storage_client: 'ObjectStorageClient'):
 @contextmanager
 def blobs_registries(
     object_storage_client: 'ObjectStorageClient',
+    retrying: 'Retrying',
     keep_blobs: bool = False,
     keep_metablobs: bool = False,
 ):
@@ -25,6 +28,6 @@ def blobs_registries(
         yield blobs, metablobs
     finally:
         if not keep_blobs:
-            blobs_gc(blobs, object_storage_client)
+            retrying(blobs_gc, blobs, object_storage_client)
         if not keep_metablobs:
-            blobs_gc(metablobs, object_storage_client)
+            retrying(blobs_gc, metablobs, object_storage_client)

@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 import attrs
 from databricks import sql
@@ -20,6 +20,9 @@ from dbxio.sql.results import _FutureBaseResult, _FutureODBCResult, _FutureState
 from dbxio.utils.databricks import ClusterType
 from dbxio.utils.logging import get_logger
 
+if TYPE_CHECKING:
+    from tenacity import Retrying
+
 logger = get_logger()
 
 
@@ -28,6 +31,11 @@ class SQLDriver:
     """
     Interface for SQL drivers.
     """
+
+    @property
+    @abstractmethod
+    def retrying(self) -> 'Retrying':
+        raise NotImplementedError
 
     @property
     @abstractmethod
@@ -107,6 +115,7 @@ class ODBCDriver(SQLDriver):
 
     cluster_type: ClusterType = attrs.field(validator=attrs.validators.instance_of(ClusterType))
     cluster_credentials: ClusterCredentials = attrs.field(validator=attrs.validators.instance_of(ClusterCredentials))
+    retrying: 'Retrying'
     session_configuration: Optional[dict[str, Any]] = attrs.field(default=None)
 
     conn: Optional[Connection] = attrs.field(default=None, init=False, repr=False)
@@ -131,8 +140,7 @@ class ODBCDriver(SQLDriver):
             if not self.conn or not self.cursor or not self.cursor.open or not self.conn.open:
                 self.conn = sql.connect(**self.as_dict())
                 self.cursor = self.conn.cursor()
-
-            self.cursor.execute(operation=built_query, parameters=built_params)
+            self.retrying(self.cursor.execute, operation=built_query, parameters=built_params)
             return self.conn, self.cursor
 
         return _FutureODBCResult(self.thread_pool.submit(_execute_sql_query))
@@ -162,6 +170,7 @@ class StatementAPIDriver(SQLDriver):
     cluster_type: ClusterType = attrs.field(validator=attrs.validators.instance_of(ClusterType))
     cluster_credentials: ClusterCredentials = attrs.field(validator=attrs.validators.instance_of(ClusterCredentials))
     statement_api: StatementExecutionAPI = attrs.field(validator=attrs.validators.instance_of(StatementExecutionAPI))
+    retrying: 'Retrying'
 
     def _sql_impl(self, built_query: str, built_params: QUERY_PARAMS_TYPE) -> _FutureStatementApiResult:
         warehouse_id = self.cluster_credentials.http_path.split('/')[-1]
@@ -171,7 +180,8 @@ class StatementAPIDriver(SQLDriver):
                 isinstance(p, StatementParameterListItem) for p in built_params
             ), f'Invalid parameters types, got {built_params}'
 
-        statement_response = self.statement_api.execute_statement(
+        statement_response = self.retrying(
+            self.statement_api.execute_statement,
             statement=built_query,
             parameters=built_params,  # type: ignore
             warehouse_id=warehouse_id,
@@ -196,6 +206,7 @@ def get_sql_driver(
     cluster_type: ClusterType,
     cluster_credentials: ClusterCredentials,
     statement_api: StatementExecutionAPI,
+    retrying: 'Retrying',
     session_configuration: Optional[dict[str, Any]] = None,
 ) -> SQLDriver:
     """
@@ -206,12 +217,14 @@ def get_sql_driver(
             cluster_type=cluster_type,
             cluster_credentials=cluster_credentials,
             session_configuration=session_configuration,
+            retrying=retrying,
         )
     elif cluster_type is ClusterType.SQL_WAREHOUSE:
         return StatementAPIDriver(
             cluster_type=cluster_type,
             cluster_credentials=cluster_credentials,
             statement_api=statement_api,
+            retrying=retrying,
         )
     else:
         raise ValueError(f'Unsupported cluster type: {cluster_type}')

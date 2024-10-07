@@ -13,7 +13,6 @@ from dbxio.sql.results import _FutureBaseResult
 from dbxio.utils.blobs import blobs_registries
 from dbxio.utils.databricks import get_external_location_storage_url, get_volume_url
 from dbxio.utils.logging import get_logger
-from dbxio.utils.retries import dbxio_retry
 
 if TYPE_CHECKING:
     from dbxio.core.client import DbxIOClient
@@ -42,7 +41,6 @@ class Volume:
     storage_location: Union[str, None] = None
 
     @classmethod
-    @dbxio_retry
     def from_url(cls, url: str, client: 'DbxIOClient') -> 'Volume':
         """
         Creates a Volume object from a URL.
@@ -53,7 +51,7 @@ class Volume:
             raise ValueError('URL must start with /Volumes/')
 
         _, catalog, schema, name, *path = url.lstrip('/').split('/')
-        raw_volume_info = client.workspace_api.volumes.read(f'{catalog}.{schema}.{name}')
+        raw_volume_info = client.retrying(client.workspace_api.volumes.read, f'{catalog}.{schema}.{name}')
         return cls(
             catalog=catalog,
             schema=schema,
@@ -96,13 +94,12 @@ class Volume:
         return self.volume_type is VolumeType.EXTERNAL
 
 
-@dbxio_retry
 def create_volume(volume: Volume, client: 'DbxIOClient', skip_if_exists: bool = True) -> None:
     if skip_if_exists and exists_volume(volume.catalog, volume.schema, volume.name, client):
         logger.info(f'Volume {volume.safe_full_name} already exists, skipping creation.')
         return
-
-    client.workspace_api.volumes.create(
+    client.retrying(
+        client.workspace_api.volumes.create,
         catalog_name=volume.catalog,
         schema_name=volume.schema,
         name=volume.name,
@@ -112,50 +109,47 @@ def create_volume(volume: Volume, client: 'DbxIOClient', skip_if_exists: bool = 
     logger.info(f'Volume {volume.safe_full_name} was successfully created.')
 
 
-@dbxio_retry
 def exists_volume(catalog_name: str, schema_name: str, volume_name: str, client: 'DbxIOClient') -> bool:
-    for v in client.workspace_api.volumes.list(catalog_name=catalog_name, schema_name=schema_name):
+    for v in client.retrying(client.workspace_api.volumes.list, catalog_name=catalog_name, schema_name=schema_name):
         if v.name == volume_name:
             return True
 
     return False
 
 
-def _download_external_volume(local_path: Path, storage_location: str, volume_path: str) -> None:
+def _download_external_volume(local_path: Path, storage_location: str, volume_path: str, client: 'DbxIOClient') -> None:
     object_storage = ObjectStorageClient.from_url(storage_location)
     assert object_storage.blobs_path, f'Object storage client must have a blobs path, got {object_storage=}'
     download_blob_tree(
         object_storage_client=object_storage,
         local_path=local_path,
         prefix_path=str(Path(object_storage.blobs_path) / Path(volume_path)),
+        client=client,
     )
 
 
-@dbxio_retry
 def _download_single_file_from_managed_volume(local_path: Path, file_path: str, client: 'DbxIOClient'):
     with open(local_path / Path(file_path).name, 'wb') as f:
-        response_content = client.workspace_api.files.download(file_path).contents
+        response_content = client.retrying(client.workspace_api.files.download, file_path).contents
         if response_content:
             f.write(response_content.read())
         else:
             raise ValueError(f'Failed to download file {file_path}, got None')
 
 
-@dbxio_retry
 def _check_if_path_is_remote_file(path: str, client: 'DbxIOClient') -> bool:
     try:
-        client.workspace_api.files.get_metadata(path)
+        client.retrying(client.workspace_api.files.get_metadata, path)
         return True
     except NotFound:
         return False
 
 
-@dbxio_retry
 def _download_managed_volume(local_path: Path, volume: Volume, client: 'DbxIOClient'):
     if _check_if_path_is_remote_file(volume.mount_path, client):
         _download_single_file_from_managed_volume(local_path, volume.mount_path, client)
         return
-    for file in client.workspace_api.files.list_directory_contents(volume.mount_path):
+    for file in client.retrying(client.workspace_api.files.list_directory_contents, volume.mount_path):
         if file.name is None or file.path is None:
             raise ValueError(f'File {file} has no name or path')
 
@@ -166,7 +160,6 @@ def _download_managed_volume(local_path: Path, volume: Volume, client: 'DbxIOCli
             _download_single_file_from_managed_volume(local_path, file.path, client)
 
 
-@dbxio_retry
 def download_volume(
     path: Union[str, Path],
     catalog_name: str,
@@ -200,6 +193,7 @@ def download_volume(
             local_path=path,
             storage_location=str(volume.storage_location),
             volume_path=volume.path,
+            client=client,
         )
     elif volume.volume_type == VolumeType.MANAGED:
         _download_managed_volume(local_path=path, volume=volume, client=client)
@@ -211,7 +205,6 @@ def download_volume(
     return path / volume.path
 
 
-@dbxio_retry
 def _write_external_volume(
     path: Path,
     catalog_name: str,
@@ -243,13 +236,14 @@ def _write_external_volume(
         object_storage_client = ObjectStorageClient.from_url(get_external_location_storage_url(catalog_name, client))
         prefix_blob_path = str(Path(volume.mount_start_point) / volume_path)
 
-    with blobs_registries(object_storage_client, keep_blobs=True) as (blobs, metablobs):
+    with blobs_registries(object_storage_client, retrying=client.retrying, keep_blobs=True) as (blobs, metablobs):
         # here all files in the path, including subdirectories, are uploaded to the blob storage.
         # only "hidden" files (those starting with a dot) are skipped
         files_to_upload = path.glob('**/*') if path.is_dir() else [path]
         for file in files_to_upload:
             if file.is_file() and not file.name.startswith('.'):
-                upload_file(
+                client.retrying(
+                    upload_file,
                     path=file,
                     local_path=path,
                     prefix_blob_path=prefix_blob_path,
@@ -267,7 +261,6 @@ def _write_external_volume(
     create_volume(volume=volume, client=client)
 
 
-@dbxio_retry
 def _write_managed_volume(
     path: Path,
     catalog_name: str,
@@ -293,14 +286,14 @@ def _write_managed_volume(
         if file.is_file() and not file.name.startswith('.'):
             file_name: Union[Path, str] = file.relative_to(path) if file != path else file.name
             volume_file_path = str(Path(volume.mount_path) / Path(file_name))
-            client.workspace_api.files.upload(
+            client.retrying(
+                client.workspace_api.files.upload,
                 file_path=volume_file_path,
                 contents=file.open('rb'),
                 overwrite=force,
             )
 
 
-@dbxio_retry
 def write_volume(
     path: Union[str, Path],
     catalog_name: str,
@@ -350,7 +343,6 @@ def write_volume(
     )
 
 
-@dbxio_retry
 def set_tags_on_volume(volume: Volume, tags: dict[str, str], client: 'DbxIOClient') -> _FutureBaseResult:
     """
     Sets tags on a volume.
@@ -367,7 +359,6 @@ def set_tags_on_volume(volume: Volume, tags: dict[str, str], client: 'DbxIOClien
     return client.sql(set_tags_query)
 
 
-@dbxio_retry
 def unset_tags_on_volume(volume: Volume, tags: list[str], client: 'DbxIOClient') -> _FutureBaseResult:
     """
     Unsets tags on a volume.
@@ -383,7 +374,6 @@ def unset_tags_on_volume(volume: Volume, tags: list[str], client: 'DbxIOClient')
     return client.sql(unset_tags_query)
 
 
-@dbxio_retry
 def get_tags_on_volume(volume: Volume, client: 'DbxIOClient') -> dict[str, str]:
     """
     Returns the tags on a volume.
@@ -405,7 +395,6 @@ def get_tags_on_volume(volume: Volume, client: 'DbxIOClient') -> dict[str, str]:
     return tags
 
 
-@dbxio_retry
 def set_comment_on_volume(
     volume: Volume,
     comment: Union[str, None],
@@ -424,7 +413,6 @@ def set_comment_on_volume(
     return client.sql(set_comment_query)
 
 
-@dbxio_retry
 def unset_comment_on_volume(volume: Volume, client: 'DbxIOClient') -> _FutureBaseResult:
     """
     Unsets the comment on a volume.
@@ -432,7 +420,6 @@ def unset_comment_on_volume(volume: Volume, client: 'DbxIOClient') -> _FutureBas
     return set_comment_on_volume(volume=volume, comment=None, client=client)
 
 
-@dbxio_retry
 def get_comment_on_volume(volume: Volume, client: 'DbxIOClient') -> Union[str, None]:
     """
     Returns the comment on a volume.
@@ -453,7 +440,6 @@ def get_comment_on_volume(volume: Volume, client: 'DbxIOClient') -> Union[str, N
     return None
 
 
-@dbxio_retry
 def drop_volume(volume: Volume, client: 'DbxIOClient', force: bool = False) -> None:
     """
     Deletes a volume in Databricks.
@@ -468,7 +454,7 @@ def drop_volume(volume: Volume, client: 'DbxIOClient', force: bool = False) -> N
 
         logger.info(f'External volume {volume.safe_full_name} was successfully cleaned up.')
     try:
-        client.workspace_api.volumes.delete(volume.full_name)
+        client.retrying(client.workspace_api.volumes.delete, volume.full_name)
     except ResourceDoesNotExist as e:
         if not force:
             raise e

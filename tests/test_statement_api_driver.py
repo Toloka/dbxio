@@ -52,11 +52,12 @@ def mock_get_statement_result_chunk_n(*args, **kwargs):
     'databricks.sdk.service.sql.StatementExecutionAPI.get_statement_result_chunk_n',
     side_effect=mock_get_statement_result_chunk_n,
 )
-def test_sapi_driver_sql(mock1, mock2, statement_api, cluster_credentials, requests_mock):
+def test_sapi_driver_sql(mock1, mock2, statement_api, cluster_credentials, requests_mock, default_retrying):
     driver = StatementAPIDriver(
         cluster_type=ClusterType.ALL_PURPOSE,
         cluster_credentials=cluster_credentials,
         statement_api=statement_api,
+        retrying=default_retrying,
     )
 
     with open('tests/resources/arrow_stream_1_plus_1.arrow', 'rb') as f:
@@ -77,11 +78,12 @@ def test_sapi_driver_sql(mock1, mock2, statement_api, cluster_credentials, reque
     'databricks.sdk.service.sql.StatementExecutionAPI.get_statement_result_chunk_n',
     side_effect=mock_get_statement_result_chunk_n,
 )
-def test_sapi_driver_sql_to_files(mock1, mock2, statement_api, cluster_credentials, requests_mock):
+def test_sapi_driver_sql_to_files(mock1, mock2, statement_api, cluster_credentials, requests_mock, default_retrying):
     driver = StatementAPIDriver(
         cluster_type=ClusterType.ALL_PURPOSE,
         cluster_credentials=cluster_credentials,
         statement_api=statement_api,
+        retrying=default_retrying,
     )
     with open('tests/resources/arrow_stream_1_plus_1.arrow', 'rb') as f:
         arrow_stream = f.read()

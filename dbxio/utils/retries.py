@@ -2,7 +2,6 @@ import logging
 from typing import TYPE_CHECKING
 
 from azure.core.exceptions import AzureError
-from cachetools import TTLCache, cached
 from databricks.sdk.errors.platform import PermissionDenied
 from tenacity import RetryCallState, Retrying, after_log, retry_if_exception_type, stop_after_attempt, wait_exponential
 from urllib3.exceptions import ReadTimeoutError
@@ -37,7 +36,6 @@ def _clear_client_cache(call_state: RetryCallState) -> None:
             return
 
 
-@cached(cache=TTLCache(maxsize=1024, ttl=60 * 15))
 def build_retrying(settings: 'RetryConfig') -> Retrying:
     return Retrying(
         stop=stop_after_attempt(settings.max_attempts),

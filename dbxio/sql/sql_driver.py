@@ -183,7 +183,7 @@ class StatementAPIDriver(SQLDriver):
         statement_response = self.retrying(
             self.statement_api.execute_statement,
             statement=built_query,
-            parameters=built_params,  # type: ignore
+            parameters=built_params,
             warehouse_id=warehouse_id,
             disposition=Disposition.EXTERNAL_LINKS,
             format=Format.ARROW_STREAM,

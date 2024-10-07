@@ -284,7 +284,7 @@ def bulk_write_local_files(
         for filename in files:
             client.retrying(
                 upload_file,
-                filename,  # type: ignore
+                filename,
                 p,
                 object_storage_client=object_storage,
                 prefix_blob_path=operation_uuid,

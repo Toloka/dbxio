@@ -1,11 +1,19 @@
 import logging
+from typing import TYPE_CHECKING
 
+from azure.core.exceptions import AzureError
 from databricks.sdk.errors.platform import PermissionDenied
-from tenacity import RetryCallState, after_log, retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import RetryCallState, Retrying, after_log, retry_if_exception_type, stop_after_attempt, wait_exponential
+from urllib3.exceptions import ReadTimeoutError
 
 from dbxio.utils.logging import get_logger
 
+if TYPE_CHECKING:
+    from dbxio.core.settings import RetryConfig
+
 logger = get_logger()
+
+BASE_EXCEPTIONS_TO_RETRY = (PermissionDenied, ReadTimeoutError, AzureError)
 
 
 def _clear_client_cache(call_state: RetryCallState) -> None:
@@ -28,11 +36,11 @@ def _clear_client_cache(call_state: RetryCallState) -> None:
             return
 
 
-dbxio_retry = retry(
-    stop=stop_after_attempt(7),
-    wait=wait_exponential(multiplier=1),
-    retry=retry_if_exception_type((PermissionDenied,)),
-    reraise=True,
-    before=_clear_client_cache,
-    after=after_log(logger, log_level=logging.INFO),
-)
+def build_retrying(settings: 'RetryConfig') -> Retrying:
+    return Retrying(
+        stop=stop_after_attempt(settings.max_attempts),
+        wait=wait_exponential(multiplier=settings.exponential_backoff_multiplier),
+        retry=retry_if_exception_type(BASE_EXCEPTIONS_TO_RETRY + settings.extra_exceptions_to_retry),
+        before=_clear_client_cache,
+        after=after_log(logger, log_level=logging.INFO),
+    )

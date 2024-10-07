@@ -118,6 +118,30 @@ client = dbxio.DbxIOClient.from_cluster_settings(
 )
 ```
 
+### Customize retries settings
+
+Sometimes it's vital to retry some exceptions based on your setup.
+You can customize the retry settings by passing them into the settings object.
+
+```python
+import dbxio
+
+settings = dbxio.Settings(
+    cloud_provider=dbxio.CloudProvider.AZURE,
+    retry_config=dbxio.RetryConfig(
+        max_attempts=20,
+        exponential_backoff_multiplier=1.5,
+        extra_exceptions_to_retry=(MyCustomException,),
+    ),
+)
+
+client = dbxio.DbxIOClient.from_cluster_settings(
+    # ...,
+    settings=settings,
+    # ...,
+)
+```
+
 ## Basic read/write table operations
 
 > [!NOTE]

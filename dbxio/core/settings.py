@@ -1,4 +1,5 @@
 import os
+from typing import Type, Union
 
 import attrs
 
@@ -16,9 +17,27 @@ def _cloud_provider_factory() -> CloudProvider:
     return CloudProvider(os.getenv(CLOUD_PROVIDER_ENV_VAR, _DEFAULT_CLOUD_PROVIDER).lower())
 
 
+@attrs.frozen
+class RetryConfig:
+    max_attempts: int = attrs.field(default=7, validator=[attrs.validators.instance_of(int), attrs.validators.ge(1)])
+    exponential_backoff_multiplier: Union[float, int] = attrs.field(
+        default=1.0,
+        validator=[attrs.validators.instance_of((float, int)), attrs.validators.ge(0)],
+    )
+    extra_exceptions_to_retry: tuple[Type[BaseException]] = attrs.field(
+        factory=tuple,
+        validator=attrs.validators.deep_iterable(
+            member_validator=attrs.validators.instance_of(type),
+            iterable_validator=attrs.validators.instance_of(tuple),
+        ),
+    )
+
+
 @attrs.define
 class Settings:
     cloud_provider: CloudProvider = attrs.field(factory=_cloud_provider_factory)
+
+    retry_config: RetryConfig = attrs.field(factory=RetryConfig)
 
     @cloud_provider.validator
     def _validate_cloud_provider(self, attribute, value):

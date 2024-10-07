@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 import attrs
 from databricks.sdk import StatementExecutionAPI, WorkspaceClient
@@ -11,6 +11,10 @@ from dbxio.sql.results import _FutureBaseResult
 from dbxio.sql.sql_driver import SQLDriver, get_sql_driver
 from dbxio.utils.databricks import ClusterType
 from dbxio.utils.logging import get_logger
+from dbxio.utils.retries import build_retrying
+
+if TYPE_CHECKING:
+    from tenacity import Retrying
 
 logger = get_logger()
 
@@ -107,11 +111,16 @@ class DbxIOClient:
         return self.workspace_api.statement_execution
 
     @property
+    def retrying(self) -> 'Retrying':
+        return build_retrying(self.settings.retry_config)
+
+    @property
     def _sql_driver(self) -> SQLDriver:
         return get_sql_driver(
             cluster_type=self.credential_provider.cluster_type,
             cluster_credentials=self._cluster_credentials,
             statement_api=self.statement_api,
+            retrying=self.retrying,
             session_configuration=self.session_configuration,
         )
 
@@ -134,8 +143,7 @@ class DbxIOClient:
         Execute the SQL query and save the results to the specified directory.
         Returns the path to the directory with the results including the statement ID.
         """
-
-        return self._sql_driver.sql_to_files(query, results_path, max_concurrency)
+        return self.retrying(self._sql_driver.sql_to_files, query, results_path, max_concurrency)
 
 
 class DefaultDbxIOClient(DbxIOClient):
@@ -146,6 +154,7 @@ class DefaultDbxIOClient(DbxIOClient):
     """
 
     def __init__(self, session_configuration: Optional[Dict[str, Any]] = None):
+        logger.info('Creating a default client for all-purpose clusters')
         super().__init__(
             credential_provider=DefaultCredentialProvider(cluster_type=ClusterType.ALL_PURPOSE),
             session_configuration=session_configuration,
@@ -161,6 +170,7 @@ class DefaultSqlDbxIOClient(DbxIOClient):
     """
 
     def __init__(self, session_configuration: Optional[Dict[str, Any]] = None):
+        logger.info('Creating a default client for SQL warehouses')
         super().__init__(
             credential_provider=DefaultCredentialProvider(cluster_type=ClusterType.SQL_WAREHOUSE),
             session_configuration=session_configuration,

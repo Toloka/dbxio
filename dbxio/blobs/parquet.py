@@ -8,6 +8,8 @@ import pyarrow.parquet as pq
 from dbxio.sql.types import convert_dbxio_type_to_pa_type
 
 if TYPE_CHECKING:
+    from tenacity import Retrying
+
     from dbxio.core.cloud.client.object_storage import ObjectStorageClient
     from dbxio.delta.table import Table
     from dbxio.delta.table_schema import TableSchema
@@ -42,6 +44,7 @@ def create_tmp_parquet(
     data: bytes,
     table_identifier: Union[str, 'Table'],
     object_storage_client: 'ObjectStorageClient',
+    retrying: 'Retrying',
 ) -> Iterator[str]:
     random_part = uuid.uuid4()
     ti = table_identifier if isinstance(table_identifier, str) else table_identifier.table_identifier
@@ -49,7 +52,7 @@ def create_tmp_parquet(
         str.maketrans('.!"#$%&\'()*+,/:;<=>?@[\\]^`{|}~', '______________________________')
     )
     tmp_path = f'{translated_table_identifier}__dbxio_tmp__{random_part}.parquet'
-    object_storage_client.upload_blob(tmp_path, data, overwrite=True)
+    retrying(object_storage_client.upload_blob, tmp_path, data, overwrite=True)
     try:
         yield tmp_path
     finally:

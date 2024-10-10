@@ -37,24 +37,39 @@ def exists_table(table: Union[str, Table], client: 'DbxIOClient') -> bool:
         return False
 
 
-def create_table(table: Union[str, Table], client: 'DbxIOClient') -> _FutureBaseResult:
-    """
-    Creates a table in the catalog.
-    If a table already exists, it does nothing.
-    Query pattern:
-        CREATE TABLE IF NOT EXISTS <table_identifier> (col1 type1, col2 type2, ...)
-        [USING <table_format> LOCATION <location>]
-        [PARTITIONED BY (col1, col2, ...)]
-    """
+def _create_table_query(table: Union[str, Table], replace: bool, if_not_exists: bool, include_schema: bool) -> str:
     dbxio_table = Table.from_obj(table)
 
-    schema_sql = ','.join([f'`{col_name}` {col_type}' for col_name, col_type in dbxio_table.schema.as_dict().items()])
-    query = f'CREATE TABLE IF NOT EXISTS {dbxio_table.safe_table_identifier} ({schema_sql})'
+    if include_schema and dbxio_table.schema:
+        schema_sql = f'({dbxio_table.schema.as_sql()})'
+    else:
+        schema_sql = ''
+    if replace:
+        query = 'CREATE OR REPLACE TABLE'
+    else:
+        query = 'CREATE TABLE'
+        if if_not_exists:
+            query += ' IF NOT EXISTS'
+    query += f' {dbxio_table.safe_table_identifier} {schema_sql}'
     if loc := dbxio_table.attributes.location:
         query += f" USING {dbxio_table.table_format.name} LOCATION '{loc}'"
     if part := dbxio_table.attributes.partitioned_by:
         query += f" PARTITIONED BY ({','.join(part)})"
 
+    return query
+
+
+def create_table(table: Union[str, Table], client: 'DbxIOClient', replace: bool = False) -> _FutureBaseResult:
+    """
+    Creates a table in the catalog.
+    If replace == False: if a table already exists, it does nothing.
+    If replace == True: create or replace table.
+    Query pattern:
+        CREATE [OR REPLACE] TABLE [IF NOT EXISTS] <table_identifier> (col1 type1, col2 type2, ...)
+        [USING <table_format> LOCATION <location>]
+        [PARTITIONED BY (col1, col2, ...)]
+    """
+    query = _create_table_query(table, replace, True, True)
     return client.sql(query)
 
 
@@ -200,6 +215,48 @@ def copy_into_table(
     client.sql(sql_copy_into_query).wait()
 
 
+def read_files_as_table(
+    client: 'DbxIOClient',
+    table: Table,
+    blob_path: str,
+    table_format: TableFormat,
+    abs_name: str,
+    abs_container_name: str,
+    include_files_pattern: bool = False,
+    replace: bool = False,
+    force_schema: bool = True,
+) -> None:
+    """
+    Copy data from blob storage as a table. All files that match the pattern *.{table_format} will be copied.
+    If force_schema == False it will use schemaHints instead of schema option
+    """
+    create_query = _create_table_query(table, replace, False, False)
+    options = {
+        'format': f"'{table_format.value.lower()}'",
+    }
+    if include_files_pattern:
+        options['fileNamePattern'] = f"'*.{table_format.value.lower()}'"
+    if table.schema:
+        sql_schema = f"'{table.schema.as_sql()}'"
+        if force_schema:
+            options['schema'] = sql_schema
+        else:
+            options['schemaHints'] = sql_schema
+    else:
+        options['mergeSchema'] = 'true'
+
+    options_query = ',\n'.join([f'{k} => {v}' for k, v in options.items()])
+    select_query = dedent(f"""
+    AS SELECT *
+    FROM read_files(
+        'abfss://{abs_container_name}@{abs_name}.dfs.core.windows.net/{blob_path}',
+        {options_query}
+    )
+    """)
+    query = ConstDatabricksQuery(f'{create_query} {select_query}')
+    client.sql(query).wait()
+
+
 def bulk_write_table(
     table: Union[str, Table],
     new_records: Union[Iterator[Dict], List[Dict]],
@@ -241,17 +298,24 @@ def bulk_write_table(
         retrying=client.retrying,
     ) as tmp_path:
         if not append:
-            drop_table(dbxio_table, client=client, force=True).wait()
-        create_table(dbxio_table, client=client).wait()
-
-        copy_into_table(
-            client=client,
-            table=dbxio_table,
-            table_format=TableFormat.PARQUET,
-            blob_path=tmp_path,
-            abs_name=abs_name,
-            abs_container_name=abs_container_name,
-        )
+            read_files_as_table(
+                client=client,
+                table=dbxio_table,
+                table_format=TableFormat.PARQUET,
+                blob_path=tmp_path,
+                abs_name=abs_name,
+                abs_container_name=abs_container_name,
+                replace=True,
+            )
+        else:
+            copy_into_table(
+                client=client,
+                table=dbxio_table,
+                table_format=TableFormat.PARQUET,
+                blob_path=tmp_path,
+                abs_name=abs_name,
+                abs_container_name=abs_container_name,
+            )
 
 
 def bulk_write_local_files(
@@ -270,7 +334,7 @@ def bulk_write_local_files(
     """
     assert table.schema, 'Table schema is required for bulk_write_local_files function'
 
-    p = Path(path)
+    p = Path(path).expanduser()
     files = p.glob(f'*.{table_format.value.lower()}') if p.is_dir() else [path]
 
     operation_uuid = str(uuid.uuid4())
@@ -294,21 +358,30 @@ def bulk_write_local_files(
                 force=force,
             )
 
-        if not append:
-            drop_table(table, client=client, force=True).wait()
-        create_table(table, client=client).wait()
-
         common_blob_path = str(os.path.commonpath(blobs))
         include_files_pattern = len(blobs) > 1
-        copy_into_table(
-            client=client,
-            table=table,
-            table_format=table_format,
-            blob_path=common_blob_path,
-            include_files_pattern=include_files_pattern,
-            abs_name=abs_name,
-            abs_container_name=abs_container_name,
-        )
+
+        if not append:
+            read_files_as_table(
+                client=client,
+                table=table,
+                table_format=table_format,
+                blob_path=common_blob_path,
+                include_files_pattern=include_files_pattern,
+                abs_name=abs_name,
+                abs_container_name=abs_container_name,
+                replace=True,
+            )
+        else:
+            copy_into_table(
+                client=client,
+                table=table,
+                table_format=table_format,
+                blob_path=common_blob_path,
+                include_files_pattern=include_files_pattern,
+                abs_name=abs_name,
+                abs_container_name=abs_container_name,
+            )
 
 
 def merge_table(

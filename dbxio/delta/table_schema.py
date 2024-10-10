@@ -73,5 +73,11 @@ class TableSchema:
     def as_dict(self) -> dict[str, BaseType]:
         return {col_spec.name: col_spec.type for col_spec in self._columns}
 
+    @cache
+    def as_sql(self) -> str:
+        return ', '.join([
+            f'`{name}` {type_}' for name, type_ in self.as_dict().items()
+        ])
+
     def apply(self, record: dict[str, Any]) -> dict[str, Any]:
         return {key: self.as_dict()[key].deserialize(val) for key, val in record.items()}

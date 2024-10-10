@@ -12,6 +12,7 @@ from dbxio.delta.table_commands import (
     bulk_write_local_files,
     bulk_write_table,
     copy_into_table,
+    read_files_as_table,
     create_table,
     drop_table,
     exists_table,
@@ -60,14 +61,19 @@ class TestTableCommands(unittest.TestCase):
     @patch.object(DbxIOClient, 'sql', side_effect=sql_mock)
     def test_create_table(self, mock_sql):
         create_table(self.table, self.client)
-        mock_sql.assert_called_once_with('CREATE TABLE IF NOT EXISTS `catalog`.`schema`.`table` (`a` INT,`b` INT)')
+        mock_sql.assert_called_once_with('CREATE TABLE IF NOT EXISTS `catalog`.`schema`.`table` (`a` INT, `b` INT)')
+
+    @patch.object(DbxIOClient, 'sql', side_effect=sql_mock)
+    def test_create_or_replace_table(self, mock_sql):
+        create_table(self.table, self.client, replace=True)
+        mock_sql.assert_called_once_with('CREATE OR REPLACE TABLE `catalog`.`schema`.`table` (`a` INT, `b` INT)')
 
     @patch.object(DbxIOClient, 'sql', side_effect=sql_mock)
     def test_create_table_with_location(self, mock_sql):
         self.table.attributes.location = 's3://test-bucket/test-path'
         create_table(self.table, self.client)
         mock_sql.assert_called_once_with(
-            'CREATE TABLE IF NOT EXISTS `catalog`.`schema`.`table` (`a` INT,`b` INT) '
+            'CREATE TABLE IF NOT EXISTS `catalog`.`schema`.`table` (`a` INT, `b` INT) '
             "USING DELTA LOCATION 's3://test-bucket/test-path'"
         )
 
@@ -76,7 +82,7 @@ class TestTableCommands(unittest.TestCase):
         self.table.attributes.partitioned_by = ['a']
         create_table(self.table, self.client)
         mock_sql.assert_called_once_with(
-            'CREATE TABLE IF NOT EXISTS `catalog`.`schema`.`table` (`a` INT,`b` INT) PARTITIONED BY (a)'
+            'CREATE TABLE IF NOT EXISTS `catalog`.`schema`.`table` (`a` INT, `b` INT) PARTITIONED BY (a)'
         )
 
     @patch.object(DbxIOClient, 'sql', side_effect=sql_mock)
@@ -151,6 +157,44 @@ class TestTableCommands(unittest.TestCase):
         assert flatten_query(observed_query) == flatten_query(expected_query)
 
     @patch.object(DbxIOClient, 'sql', side_effect=sql_mock)
+    def test_read_files_as_table(self, mock_sql):
+        read_files_as_table(
+            self.client,
+            table=self.table,
+            blob_path='test-bucket/test-path',
+            table_format=TableFormat.PARQUET,
+            abs_name='test_abs_name',
+            abs_container_name='test_abs_container_name',
+        )
+        expected_query = dedent("""
+        CREATE TABLE `catalog`.`schema`.`table`
+        AS SELECT * FROM read_files( 'abfss://test_abs_container_name@test_abs_name.dfs.core.windows.net/test-bucket/test-path', format => 'parquet', schema => '`a` INT, `b` INT' )
+        """)
+        observed_query = mock_sql.call_args[0][0].query
+
+        assert flatten_query(observed_query) == flatten_query(expected_query)
+
+    @patch.object(DbxIOClient, 'sql', side_effect=sql_mock)
+    def test_read_files_as_replace_table(self, mock_sql):
+        read_files_as_table(
+            self.client,
+            table=self.table,
+            blob_path='test-bucket/test-path',
+            table_format=TableFormat.PARQUET,
+            abs_name='test_abs_name',
+            abs_container_name='test_abs_container_name',
+            replace=True,
+            force_schema=False,
+        )
+        expected_query = dedent("""
+        CREATE OR REPLACE TABLE `catalog`.`schema`.`table`
+        AS SELECT * FROM read_files( 'abfss://test_abs_container_name@test_abs_name.dfs.core.windows.net/test-bucket/test-path', format => 'parquet', schemaHints => '`a` INT, `b` INT' )
+        """)
+        observed_query = mock_sql.call_args[0][0].query
+
+        assert flatten_query(observed_query) == flatten_query(expected_query)
+
+    @patch.object(DbxIOClient, 'sql', side_effect=sql_mock)
     def test_merge_table(self, mock_sql):
         merge_table(
             table=self.table,
@@ -161,7 +205,7 @@ class TestTableCommands(unittest.TestCase):
 
         # check that it tries to create table
         observed_query = mock_sql.call_args_list[0][0][0]
-        assert observed_query == 'CREATE TABLE IF NOT EXISTS `catalog`.`schema`.`table__dbxio_tmp` (`a` INT,`b` INT)'
+        assert observed_query == 'CREATE TABLE IF NOT EXISTS `catalog`.`schema`.`table__dbxio_tmp` (`a` INT, `b` INT)'
 
         # check that it tries to insert data into temp table
         observed_query = mock_sql.call_args_list[1][0][0]

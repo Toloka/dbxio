@@ -70,7 +70,7 @@ class _AzureBlobStorageClientImpl(ObjectStorageClient):
 
     def break_lease(self, blob_name: str) -> None:
         blob_client = self.blob_service_client.get_blob_client(container=self.container_name, blob=blob_name)
-        BlobLeaseClient(client=blob_client).break_lease()  # type: ignore
+        BlobLeaseClient(client=blob_client).break_lease()
 
     def lock_blob(self, blob_name: str, force: bool = False):
         blob_client = self.blob_service_client.get_blob_client(container=self.container_name, blob=blob_name)
@@ -90,7 +90,7 @@ class _AzureBlobStorageClientImpl(ObjectStorageClient):
 
     def try_delete_blob(self, blob_name: str) -> None:
         blob_client = self.blob_service_client.get_blob_client(container=self.container_name, blob=blob_name)
-        lease_client = BlobLeaseClient(client=blob_client)  # type: ignore
+        lease_client = BlobLeaseClient(client=blob_client)
 
         try:
             lease_client.break_lease()

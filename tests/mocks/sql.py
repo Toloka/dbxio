@@ -4,7 +4,7 @@ from dbxio.sql.query import BaseDatabricksQuery
 def flatten_query(query):
     if isinstance(query, BaseDatabricksQuery):
         query = query.query
-    return ' '.join([s.strip() for s in query.splitlines()])
+    return ' '.join([s.strip() for s in query.splitlines()]).strip()
 
 
 class ArbitraryRecord(dict):

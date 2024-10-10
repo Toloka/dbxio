@@ -84,7 +84,7 @@ class Table:
         default=Materialization.Table,
         validator=attrs.validators.instance_of(Materialization),
     )
-    schema: Optional[Union[dict[str, BaseType], list[dict[str, BaseType]], TableSchema]] = attrs.field(
+    schema: Optional[TableSchema] = attrs.field(
         default=None,
         converter=_table_schema_converter,
     )

@@ -69,7 +69,7 @@ def create_table(table: Union[str, Table], client: 'DbxIOClient', replace: bool 
         [USING <table_format> LOCATION <location>]
         [PARTITIONED BY (col1, col2, ...)]
     """
-    query = _create_table_query(table, replace, True, True)
+    query = _create_table_query(table, replace, if_not_exists=True, include_schema=True)
     return client.sql(query)
 
 
@@ -230,7 +230,7 @@ def read_files_as_table(
     Copy data from blob storage as a table. All files that match the pattern *.{table_format} will be copied.
     If force_schema == False it will use schemaHints instead of schema option
     """
-    create_query = _create_table_query(table, replace, False, False)
+    create_query = _create_table_query(table, replace, if_not_exists=False, include_schema=False)
     options = {
         'format': f"'{table_format.value.lower()}'",
     }
@@ -238,16 +238,18 @@ def read_files_as_table(
         options['fileNamePattern'] = f"'*.{table_format.value.lower()}'"
     if table.schema:
         sql_schema = f"'{table.schema.as_sql()}'"
+        columns_exp = ', '.join(table.schema.columns)
         if force_schema:
             options['schema'] = sql_schema
         else:
             options['schemaHints'] = sql_schema
     else:
+        columns_exp = '*'
         options['mergeSchema'] = 'true'
 
     options_query = ',\n'.join([f'{k} => {v}' for k, v in options.items()])
     select_query = dedent(f"""
-    AS SELECT *
+    AS SELECT {columns_exp}
     FROM read_files(
         'abfss://{abs_container_name}@{abs_name}.dfs.core.windows.net/{blob_path}',
         {options_query}

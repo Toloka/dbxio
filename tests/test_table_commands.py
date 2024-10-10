@@ -12,13 +12,13 @@ from dbxio.delta.table_commands import (
     bulk_write_local_files,
     bulk_write_table,
     copy_into_table,
-    read_files_as_table,
     create_table,
     drop_table,
     exists_table,
     get_comment_on_table,
     get_tags_on_table,
     merge_table,
+    read_files_as_table,
     read_table,
     save_table_to_files,
     set_comment_on_table,
@@ -168,8 +168,8 @@ class TestTableCommands(unittest.TestCase):
         )
         expected_query = dedent("""
         CREATE TABLE `catalog`.`schema`.`table`
-        AS SELECT * FROM read_files( 'abfss://test_abs_container_name@test_abs_name.dfs.core.windows.net/test-bucket/test-path', format => 'parquet', schema => '`a` INT, `b` INT' )
-        """)
+        AS SELECT a, b FROM read_files( 'abfss://test_abs_container_name@test_abs_name.dfs.core.windows.net/test-bucket/test-path', format => 'parquet', schema => '`a` INT, `b` INT' )
+        """)  # noqa: E501
         observed_query = mock_sql.call_args[0][0].query
 
         assert flatten_query(observed_query) == flatten_query(expected_query)
@@ -188,8 +188,28 @@ class TestTableCommands(unittest.TestCase):
         )
         expected_query = dedent("""
         CREATE OR REPLACE TABLE `catalog`.`schema`.`table`
-        AS SELECT * FROM read_files( 'abfss://test_abs_container_name@test_abs_name.dfs.core.windows.net/test-bucket/test-path', format => 'parquet', schemaHints => '`a` INT, `b` INT' )
-        """)
+        AS SELECT a, b FROM read_files( 'abfss://test_abs_container_name@test_abs_name.dfs.core.windows.net/test-bucket/test-path', format => 'parquet', schemaHints => '`a` INT, `b` INT' )
+        """)  # noqa: E501
+        observed_query = mock_sql.call_args[0][0].query
+
+        assert flatten_query(observed_query) == flatten_query(expected_query)
+
+    @patch.object(DbxIOClient, 'sql', side_effect=sql_mock)
+    def test_read_files_as_table_without_schema(self, mock_sql):
+        read_files_as_table(
+            self.client,
+            table=Table('catalog.schema.table'),
+            blob_path='test-bucket/test-path',
+            table_format=TableFormat.PARQUET,
+            abs_name='test_abs_name',
+            abs_container_name='test_abs_container_name',
+            replace=True,
+            force_schema=False,
+        )
+        expected_query = dedent("""
+        CREATE OR REPLACE TABLE `catalog`.`schema`.`table`
+        AS SELECT * FROM read_files( 'abfss://test_abs_container_name@test_abs_name.dfs.core.windows.net/test-bucket/test-path', format => 'parquet', mergeSchema => true )
+        """)  # noqa: E501
         observed_query = mock_sql.call_args[0][0].query
 
         assert flatten_query(observed_query) == flatten_query(expected_query)

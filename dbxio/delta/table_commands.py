@@ -310,6 +310,7 @@ def bulk_write_table(
                 replace=True,
             )
         else:
+            create_table(dbxio_table, client=client).wait()
             copy_into_table(
                 client=client,
                 table=dbxio_table,
@@ -375,6 +376,7 @@ def bulk_write_local_files(
                 replace=True,
             )
         else:
+            create_table(table, client=client).wait()
             copy_into_table(
                 client=client,
                 table=table,

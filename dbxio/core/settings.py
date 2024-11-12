@@ -19,7 +19,7 @@ def _cloud_provider_factory() -> CloudProvider:
 
 @attrs.frozen
 class RetryConfig:
-    max_attempts: int = attrs.field(default=7, validator=[attrs.validators.instance_of(int), attrs.validators.ge(1)])
+    max_attempts: int = attrs.field(default=7, validator=[attrs.validators.instance_of(int), attrs.validators.ge(0)])
     exponential_backoff_multiplier: Union[float, int] = attrs.field(
         default=1.0,
         validator=[attrs.validators.instance_of((float, int)), attrs.validators.ge(0)],
@@ -31,6 +31,10 @@ class RetryConfig:
             iterable_validator=attrs.validators.instance_of(tuple),
         ),
     )
+
+    @property
+    def empty(self):
+        return self.max_attempts == 0
 
 
 @attrs.define

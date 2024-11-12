@@ -1,5 +1,5 @@
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable
 
 from azure.core.exceptions import AzureError
 from databricks.sdk.errors.platform import PermissionDenied
@@ -36,7 +36,20 @@ def _clear_client_cache(call_state: RetryCallState) -> None:
             return
 
 
+class NoRetrying(Retrying):
+    def __call__(
+        self,
+        fn: Callable[..., Any],
+        *args: Any,
+        **kwargs: Any,
+    ):
+        return fn(*args, **kwargs)
+
+
 def build_retrying(settings: 'RetryConfig') -> Retrying:
+    if settings.empty:
+        return NoRetrying()
+
     return Retrying(
         stop=stop_after_attempt(settings.max_attempts),
         wait=wait_exponential(multiplier=settings.exponential_backoff_multiplier),

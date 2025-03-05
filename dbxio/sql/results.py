@@ -10,6 +10,7 @@ import pandas as pd
 import pyarrow as pa
 from databricks.sdk.service.sql import (
     ExecuteStatementResponse,
+    GetStatementResponse,
     StatementExecutionAPI,
     StatementState,
     StatementStatus,
@@ -205,17 +206,19 @@ class _FutureStatementApiResult(_FutureBaseResult):
             raise ReadDataError(msg)
 
     def _is_statement_ready_to_fetch(self):
-        status: StatementStatus = self.statement_api.get_statement(self.statement_id).status
-        state: StatementState = status.state
-        self.raise_for_status(status)
+        statement: GetStatementResponse = self.statement_api.get_statement(self.statement_id)
+        self.raise_for_status(statement.status)
 
-        if state in (StatementState.PENDING, StatementState.RUNNING):
+        if statement.status.state in (StatementState.PENDING, StatementState.RUNNING):
             return False
 
-        if state == StatementState.SUCCEEDED:
+        if statement.status.state == StatementState.SUCCEEDED:
+            if statement.manifest.total_chunk_count is None:
+                raise
+            self._total_chunk_count = statement.manifest.total_chunk_count
             return True
 
-        raise ValueError(f'Unexpected statement state: {state}')
+        raise ValueError(f'Unexpected statement state: {statement.status.state}')
 
     def __iter__(self):
         self.wait()

@@ -214,7 +214,9 @@ class _FutureStatementApiResult(_FutureBaseResult):
 
         if statement.status.state == StatementState.SUCCEEDED:
             if statement.manifest.total_chunk_count is None:
-                raise
+                raise ValueError(
+                    f'Total chunk count is not found in the statement manifest, statement_id: {self.statement_id}'
+                )
             self._total_chunk_count = statement.manifest.total_chunk_count
             return True
 
